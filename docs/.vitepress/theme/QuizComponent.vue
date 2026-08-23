@@ -168,7 +168,9 @@ onMounted(fetchToday)
               ➗ 数学符号
             </button>
           </div>
-          <div v-if="currentQaSeq === qi" class="sym-panel">
+          <!-- v-show 而非 v-if:面板在挂载时即渲染(仅隐藏),避免 iPad WebKit
+               首次 v-if 插入时符号空白、点击后才显示的渲染 bug -->
+          <div v-show="currentQaSeq === qi" class="sym-panel">
             <button v-for="s in MATH_SYMBOLS" :key="s" type="button"
                     class="sym-btn" @click="insertSymbol(s, qi)">{{ s }}</button>
           </div>
