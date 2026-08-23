@@ -25,15 +25,15 @@ async function fetchToday() {
     const d = await r.json()
     date.value = d.date
     questions.value = d.questions
-    // 预填答案对象
+    // 预填答案对象(用数组索引做 key,不依赖 seq——seq 重复时 radio 会同名互斥丢勾选)
     answers.value = {}
-    questions.value.forEach(q => answers.value[q.seq] = q.type === 'choice' ? '' : '')
+    questions.value.forEach((q, qi) => answers.value[qi] = '')
     // 恢复暂存的未提交答案(上次提交失败时存下的)
     const draft = restoreAnswers(date.value || 'today')
     if (draft && Object.keys(draft).length) {
       let restored = 0
-      questions.value.forEach(q => {
-        if (draft[q.seq]) { answers.value[q.seq] = draft[q.seq]; restored++ }
+      questions.value.forEach((q, qi) => {
+        if (draft[qi]) { answers.value[qi] = draft[qi]; restored++ }
       })
       if (restored > 0) draftNotice.value = `📝 已恢复上次未提交的 ${restored} 题答案,可直接提交或修改`
     }
@@ -46,9 +46,10 @@ async function fetchToday() {
 
 async function submit() {
   // 组装答案文本: 选择题用字母, 问答题用文本(放括号里)
+  // 答案槽位按索引存;提交时按题目实际 seq 编号(后端已保证 seq 唯一)
   const parts = []
-  questions.value.forEach(q => {
-    const a = (answers.value[q.seq] || '').trim()
+  questions.value.forEach((q, qi) => {
+    const a = (answers.value[qi] || '').trim()
     if (!a) return
     if (q.type === 'choice') parts.push(`${q.seq}${a.toUpperCase()}`)
     else parts.push(`${q.seq}${a}`)
@@ -142,7 +143,7 @@ onMounted(fetchToday)
         你也可点击下方「⏭️ 下一轮学习」生成新题练手。
       </p>
 
-      <div v-for="q in questions" :key="q.seq" class="question">
+      <div v-for="(q, qi) in questions" :key="q.seq" class="question">
         <div class="qhead">
           <span class="badge">{{ q.subject }}</span>
           <span class="qtype">{{ q.type === 'choice' ? '选择题' : '问答题' }}</span>
@@ -152,27 +153,28 @@ onMounted(fetchToday)
         <!-- 选择题 -->
         <div v-if="q.type === 'choice'" class="options">
           <label v-for="(opt, key) in q.options" :key="key" class="opt">
-            <input type="radio" :name="'q' + q.seq" :value="key"
-                   :checked="answers[q.seq] === key"
+            <!-- name 用索引 qi 保证唯一(seq 重复时同名 radio 会互斥丢勾选) -->
+            <input type="radio" :name="'q' + qi" :value="key"
+                   :checked="answers[qi] === key"
                    :disabled="state === 'submitting'"
-                   @change="answers[q.seq] = key" />
+                   @change="answers[qi] = key" />
             <span><b>{{ key }}.</b> {{ opt }}</span>
           </label>
         </div>
         <!-- 问答题 -->
         <div v-else class="qa-area">
           <div class="sym-toolbar">
-            <button type="button" class="sym-toggle" @click="showSymbolPanel(q.seq)">
+            <button type="button" class="sym-toggle" @click="showSymbolPanel(qi)">
               ➗ 数学符号
             </button>
           </div>
-          <div v-if="currentQaSeq === q.seq" class="sym-panel">
+          <div v-if="currentQaSeq === qi" class="sym-panel">
             <button v-for="s in MATH_SYMBOLS" :key="s" type="button"
-                    class="sym-btn" @click="insertSymbol(s, q.seq)">{{ s }}</button>
+                    class="sym-btn" @click="insertSymbol(s, qi)">{{ s }}</button>
           </div>
           <textarea :placeholder="'在此输入你的作答...'"
                     rows="3" :disabled="state === 'submitting'"
-                    v-model="answers[q.seq]"></textarea>
+                    v-model="answers[qi]"></textarea>
         </div>
       </div>
 
