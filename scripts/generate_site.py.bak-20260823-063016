@@ -22,19 +22,6 @@ OUT_DIR = "docs"
 SUBJECTS = ["高等数学", "机械原理", "英语", "炼油化工设备"]
 SUBJECT_ICONS = {"高等数学": "📘", "机械原理": "⚙️", "英语": "🇬🇧", "炼油化工设备": "🏭"}
 
-# 每周科目轮换表(与 study-engine skill 一致): isoweekday 1=周一
-WEEK_ROTATION = {
-    1: ("高等数学", "炼油化工设备"),
-    2: ("机械原理", "英语"),
-    3: ("高等数学", "机械原理"),
-    4: ("英语", "炼油化工设备"),
-    5: ("高等数学", "英语"),
-    6: ("机械原理", "炼油化工设备"),
-    7: ("周总结", "错题总复习"),
-}
-WEEKDAY_CN = {1: "周一", 2: "周二", 3: "周三", 4: "周四", 5: "周五", 6: "周六", 7: "周日"}
-MODE_CN = {"light": "轻量", "standard": "标准", "intensive": "加强", "off": "休息"}
-
 # 周报存档目录(周报 cron 生成)
 WEEKLY_DIR = os.path.join(STUDY_DIR, "archive", "weekly")
 
@@ -307,205 +294,6 @@ def plan_to_markdown():
     lines.append("")
     return lines
 
-# ---------- 每日学习页 ----------
-def _today_shanghai():
-    """返回 (date_str, isoweekday) 按上海时区。"""
-    from datetime import datetime, timedelta, timezone
-    sh = timezone(timedelta(hours=8))
-    now = datetime.now(sh)
-    return now.strftime("%Y-%m-%d"), now.isoweekday()
-
-def _exam_countdown():
-    """考研倒计时(含当天)。返回 (days, stage)。"""
-    from datetime import date
-    cfg = load_json(os.path.join(STUDY_DIR, "exam_config.json"), {})
-    exam = cfg.get("exam_date", "2026-12-26")
-    try:
-        y, m, d = map(int, exam.split("-"))
-        exam_date = date(y, m, d)
-    except Exception:
-        exam_date = date(2026, 12, 26)
-    today, _ = _today_shanghai()
-    ty, tm, td = map(int, today.split("-"))
-    days = (exam_date - date(ty, tm, td)).days + 1
-    if days <= 30:
-        stage = "冲刺"
-    elif days <= 60:
-        stage = "冲刺"
-    elif days <= 150:
-        stage = "强化"
-    else:
-        stage = "基础"
-    return days, stage
-
-def _state_fields():
-    st = load_json(os.path.join(STUDY_DIR, "state.json"), {})
-    mode = st.get("mode", "standard")
-    flags = {
-        "checkin": bool(st.get("checkin_done")),
-        "lesson": bool(st.get("lesson_done")),
-        "quiz": bool(st.get("quiz_done")),
-        "review": bool(st.get("review_done")),
-    }
-    streak = st.get("streak_correct", 0)
-    return mode, flags, streak
-
-def _due_items():
-    """收集所有科目到期知识点(next_review <= 今天)。返回 [(科目, 条目)...]"""
-    today, _ = _today_shanghai()
-    due = []
-    for subj in SUBJECTS:
-        data = load_json(os.path.join(STUDY_DIR, "knowledge", f"{subj}.json"), {"items": []})
-        for it in data.get("items", []):
-            nr = it.get("next_review", "")
-            if nr and nr <= today:
-                due.append((subj, it))
-    due.sort(key=lambda x: x[1].get("next_review", ""))
-    return due
-
-def _mastery_cards():
-    """掌握度卡片 HTML(与首页一致)。"""
-    data = load_json(os.path.join(STUDY_DIR, "progress", "progress.json"), {"subjects": {}})
-    subs = data.get("subjects", {})
-    out = ['<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;">']
-    for subj in SUBJECTS:
-        m = subs.get(subj, {}).get("mastery", 0)
-        icon = SUBJECT_ICONS.get(subj, "📘")
-        color = "#3eaf7c" if m >= 50 else ("#e6a23c" if m >= 30 else "#f56c6c")
-        out.append(f'<div style="background:#fff;border:1px solid #e0e0e0;border-radius:10px;padding:10px;box-shadow:0 1px 3px rgba(0,0,0,.06);">'
-                   f'<div style="font-size:13px;color:#666;">{icon} {subj}</div>'
-                   f'<div style="font-size:22px;font-weight:700;color:{color};">{m}%</div>'
-                   f'<div style="height:5px;background:#eee;border-radius:3px;margin-top:4px;">'
-                   f'<div style="height:100%;width:{m}%;background:{color};border-radius:3px;"></div></div></div>')
-    out.append('</div>')
-    return "\n".join(out)
-
-def daily_to_markdown():
-    """每日学习页:倒计时 + 今日任务 + 今日科目 + 到期复习 + 今日知识点 + 在线小测。"""
-    today, wd = _today_shanghai()
-    days, stage = _exam_countdown()
-    mode, flags, streak = _state_fields()
-    mode_cn = MODE_CN.get(mode, mode)
-
-    lines = []
-    lines.append("---")
-    lines.append("layout: home")
-    lines.append("---")
-    lines.append("")
-    lines.append(f"# 📅 每日学习 · {today}({WEEKDAY_CN[wd]})")
-    lines.append("")
-    lines.append(f"> **考研倒计时: {days} 天 · {stage}阶段** ｜ 今日模式:**{mode_cn}** ｜ 连续答对 {streak} 次")
-    lines.append("")
-    lines.append("📌 每天 30 分钟:知识点 → 小测 → 复习错题。本页每日自动更新。")
-    lines.append("")
-
-    # 今日任务清单
-    lines.append("## ✅ 今日任务")
-    lines.append("")
-    lines.append('<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;">')
-    task_defs = [
-        ("☀️ 晨间打卡", "checkin", "#3eaf7c"),
-        ("📚 知识点", "lesson", "#3eaf7c"),
-        ("📝 每日小测", "quiz", "#3eaf7c"),
-        ("🔁 复盘复习", "review", "#3eaf7c"),
-    ]
-    for label, key, color in task_defs:
-        done = flags.get(key, False)
-        badge = "✅ 已完成" if done else "⏳ 未完成"
-        bg = "#e8f5e9" if done else "#fff8e1"
-        border = "#3eaf7c" if done else "#e6a23c"
-        lines.append(f'<div style="background:{bg};border:1px solid {border};border-radius:10px;padding:10px;text-align:center;">'
-                     f'<div style="font-size:14px;">{label}</div>'
-                     f'<div style="font-size:13px;font-weight:600;color:{border};">{badge}</div></div>')
-    lines.append('</div>')
-    lines.append("")
-
-    # 今日科目(按轮换表)
-    lines.append("## 📖 今日科目")
-    lines.append("")
-    subj_a, subj_b = WEEK_ROTATION[wd]
-    if wd == 7:  # 周日:周总结 + 错题总复习,无新知识点
-        lines.append(f"> 今天是 **周日总结日**:{subj_a} + {subj_b}。没有新知识点,复习本周内容为主。")
-    else:
-        lines.append(f"> 今日轮换:**{SUBJECT_ICONS.get(subj_a,'')} {subj_a}** + **{SUBJECT_ICONS.get(subj_b,'')} {subj_b}**(各 15 分钟)")
-        lines.append("")
-        for s in (subj_a, subj_b):
-            data = load_json(os.path.join(STUDY_DIR, "knowledge", f"{s}.json"), {"items": []})
-            n = len(data.get("items", []))
-            lines.append(f"- {SUBJECT_ICONS.get(s,'')} **{s}**:知识库 {n} 条 · [查看笔记](/subjects/{s})")
-    lines.append("")
-
-    # 到期复习
-    due = _due_items()
-    lines.append("## ⏰ 到期复习")
-    lines.append("")
-    if due:
-        lines.append(f"**{len(due)} 条知识到期**,按间隔复习(SM-2),优先复习再学新的:")
-        lines.append("")
-        for subj, it in due[:12]:
-            icon = SUBJECT_ICONS.get(subj, "📘")
-            m = it.get("mastery", 0)
-            lines.append(f"- {icon} **{subj}** · {it.get('title','')}(掌握 {m}%)")
-        if len(due) > 12:
-            lines.append(f"- ...共 {len(due)} 条")
-    else:
-        lines.append("> 🎉 今天没有到期复习,轻松学新知识!")
-    lines.append("")
-
-    # 今日知识点(非周日)
-    if wd != 7:
-        lines.append("## 📚 今日知识点")
-        lines.append("")
-        lines.append(f"**今日科目 {SUBJECT_ICONS.get(subj_a,'')} {subj_a}** 最新知识点:")
-        lines.append("")
-        data = load_json(os.path.join(STUDY_DIR, "knowledge", f"{subj_a}.json"), {"items": []})
-        items = sorted(data.get("items", []), key=lambda x: x.get("created", ""), reverse=True)
-        shown = 0
-        for it in items[:3]:
-            title = it.get("title", "")
-            content = (it.get("content", "") or "")[:250]
-            example = it.get("example", "")
-            m = it.get("mastery", 0)
-            lines.append(f"### {title}")
-            lines.append(f"> 掌握 {m}% · 创建 {it.get('created','')}")
-            if content:
-                lines.append("")
-                lines.append(content)
-            if example:
-                lines.append("")
-                lines.append(f"> **例题:** {example}")
-            lines.append("")
-            shown += 1
-        if shown == 0:
-            lines.append("> 该科目暂无知识点,等今天的课程推送后自动补充。")
-        lines.append("")
-
-    # 掌握度速览
-    lines.append("## 📊 掌握度速览")
-    lines.append("")
-    lines.append(_mastery_cards())
-    lines.append("")
-
-    # 在线小测
-    lines.append("## 📝 在线小测")
-    lines.append("")
-    lines.append("直接答题,提交后 AI 自动批改,成绩写回学习进度。")
-    lines.append("")
-    lines.append("<QuizComponent />")
-    lines.append("")
-
-    lines.append("## 🚀 快捷入口")
-    lines.append("")
-    lines.append("| 页面 | 说明 |")
-    lines.append("|------|------|")
-    lines.append("| [📝 在线小测](/quiz) | 网页答题,AI 自动批改 |")
-    lines.append("| [📈 学习进度](/progress) | 各科掌握度曲线 |")
-    lines.append("| [❌ 错题本](/mistakes) | 未解决错题 |")
-    lines.append("| [🎯 学习计划](/plan) | 考研三阶段备考计划 |")
-    lines.append("| [📅 每周周报](/reports/) | 每周备考周报 |")
-    lines.append("")
-    return lines
-
 # ---------- 首页仪表盘 ----------
 def home_to_markdown():
     lines = []
@@ -569,7 +357,6 @@ def home_to_markdown():
     lines.append("")
     lines.append("| 页面 | 说明 |")
     lines.append("|------|------|")
-    lines.append("| [📅 每日学习](/daily) | 今日任务清单+科目+小测,一页完成 |")
     lines.append("| [📝 在线小测](/quiz) | 网页答题,AI 自动批改,成绩写回进度 |")
     lines.append("| [📈 学习进度](/progress) | 各科掌握度曲线 & 最近学习要点 |")
     lines.append("| [❌ 错题本](/mistakes) | 未解决错题 & 复习记录 |")
@@ -619,11 +406,6 @@ def main():
     # 首页
     with open(os.path.join(OUT_DIR, "index.md"), "w", encoding="utf-8") as f:
         f.write("\n".join(home_to_markdown()))
-
-    # 每日学习页
-    with open(os.path.join(OUT_DIR, "daily.md"), "w", encoding="utf-8") as f:
-        f.write("\n".join(daily_to_markdown()))
-    print("✅ 每日学习页: docs/daily.md")
 
     # 四科笔记
     for subj in SUBJECTS:

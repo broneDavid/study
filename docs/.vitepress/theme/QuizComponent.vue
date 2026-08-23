@@ -1,0 +1,218 @@
+<script setup>
+import { ref, onMounted } from 'vue'
+
+// API 公网地址(VPS nginx 反代到 y7000)
+const API_BASE = 'https://hermes.4587693.xyz/quiz'
+// 轻量访问 token(用于限制滥用;含在下面前端用 .map 编码,防爬虫直接抓)
+const _t = ['31','b7','a7','46','3f','d9','db','60','c4','ff','30','bd','b9','4e','a1','fa','fd','f4','d3','97','bf','81','ab','7c'].join('')
+
+const state = ref('loading') // loading | ready | submitting | done | error
+const questions = ref([])
+const answers = ref({})      // seq -> 用户选择/填答
+const date = ref('')
+const result = ref('')
+const errorMsg = ref('')
+
+async function fetchToday() {
+  try {
+    // today 为公开读(无答案),无需 token
+    const r = await fetch(`${API_BASE}/today`)
+    if (!r.ok) throw new Error('HTTP ' + r.status)
+    const d = await r.json()
+    date.value = d.date
+    questions.value = d.questions
+    // 预填答案对象
+    answers.value = {}
+    questions.value.forEach(q => answers.value[q.seq] = q.type === 'choice' ? '' : '')
+    state.value = 'ready'
+  } catch (e) {
+    state.value = 'error'
+    errorMsg.value = '加载题目失败: ' + e.message
+  }
+}
+
+async function submit() {
+  // 组装答案文本: 选择题用字母, 问答题用文本(放括号里)
+  const parts = []
+  questions.value.forEach(q => {
+    const a = (answers.value[q.seq] || '').trim()
+    if (!a) return
+    if (q.type === 'choice') parts.push(`${q.seq}${a.toUpperCase()}`)
+    else parts.push(`${q.seq}${a}`)
+  })
+  if (parts.length === 0) return
+  const answerText = '答案：' + parts.join(' ')
+
+  state.value = 'submitting'
+  try {
+    const r = await fetch(`${API_BASE}/grade`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Quiz-Token': _t },
+      body: JSON.stringify({ answer: answerText }),
+    })
+    const d = await r.json()
+    result.value = d.result || '(无结果)'
+    state.value = 'done'
+  } catch (e) {
+    state.value = 'error'
+    errorMsg.value = '提交失败: ' + e.message
+  }
+}
+
+function isCurrent(q) {
+  return q && q.seq === questions.value[questions.value.length - 1]?.seq
+}
+
+// 数学符号面板(需求2): 点击插入到当前问答题答案
+const MATH_SYMBOLS = ['√', 'π', '±', '×', '÷', '≤', '≥', '∞', '∑', '∫', '≠', '≈', 'θ', 'α', 'β', '°', '²', '³', 'x²', 'x³', 'xⁿ', '¹⁄₂', '⁻¹', '→', 'Δ', 'λ', 'μ', 'π/2', '√x', 'sin', 'cos', 'tan', 'log', 'ln', 'lim']
+const currentQaSeq = ref(null)
+
+function insertSymbol(sym, seq) {
+  const a = answers.value[seq] || ''
+  answers.value[seq] = a + sym
+}
+
+function showSymbolPanel(seq) {
+  currentQaSeq.value = currentQaSeq.value === seq ? null : seq
+}
+
+// 需求3: 下一轮学习 —— 预生成下一批题目(不动学习进度,仅补题)
+const advancing = ref(false)
+const advanceMsg = ref('')
+async function nextRound() {
+  if (!confirm('生成下一轮学习题目？\n(将预取新的练习题,不影响已完成的进度记录)')) return
+  advancing.value = true
+  advanceMsg.value = ''
+  try {
+    const r = await fetch(`${API_BASE}/advance`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Quiz-Token': _t },
+      body: JSON.stringify({ count: 6 }),
+    })
+    const d = await r.json()
+    if (d.ok) {
+      advanceMsg.value = d.idempotent ? '✅ 已有题目,无需重复生成' : `✅ 下一轮题目已就绪 (${d.pending_now || ''} 道)`
+    } else {
+      advanceMsg.value = '⚠️ ' + (d.result || '生成失败')
+    }
+    // 刷新题目
+    await fetchToday()
+  } catch (e) {
+    advanceMsg.value = '❌ 请求失败: ' + e.message
+  }
+  advancing.value = false
+}
+
+onMounted(fetchToday)
+</script>
+
+<template>
+  <div class="quiz-wrapper">
+    <h2>📝 每日在线小测</h2>
+    <p class="sub">学习系统实时出题 · 网页答题 · AI 自动批改并写入学习进度</p>
+
+    <div v-if="state === 'loading'" class="status">⏳ 加载今日题目...</div>
+    <div v-else-if="state === 'error'" class="status error">
+      <p>⚠️ {{ errorMsg }}</p>
+      <p class="hint">若长时间加载失败,可能是学习服务(AI后端)未运行。可稍后再试。</p>
+      <button @click="fetchToday">重试</button>
+    </div>
+
+    <template v-else-if="state === 'ready' || state === 'submitting'">
+      <p v-if="questions.length === 0" class="status">
+        今天暂时没有待批改的小测题。<br>
+        小测每天 14:00 由学习系统 @Studyingschedulebot 推送,答过的题会自动批改。<br>
+        你也可先在下方复习区手动练题。
+      </p>
+
+      <div v-for="q in questions" :key="q.seq" class="question">
+        <div class="qhead">
+          <span class="badge">{{ q.subject }}</span>
+          <span class="qtype">{{ q.type === 'choice' ? '选择题' : '问答题' }}</span>
+        </div>
+        <p class="qtext"><b>[{{ q.seq }}]</b> {{ q.q || q.title }}</p>
+
+        <!-- 选择题 -->
+        <div v-if="q.type === 'choice'" class="options">
+          <label v-for="(opt, key) in q.options" :key="key" class="opt">
+            <input type="radio" :name="'q' + q.seq" :value="key"
+                   :checked="answers[q.seq] === key"
+                   :disabled="state === 'submitting'"
+                   @change="answers[q.seq] = key" />
+            <span><b>{{ key }}.</b> {{ opt }}</span>
+          </label>
+        </div>
+        <!-- 问答题 -->
+        <div v-else class="qa-area">
+          <div class="sym-toolbar">
+            <button type="button" class="sym-toggle" @click="showSymbolPanel(q.seq)">
+              ➗ 数学符号
+            </button>
+          </div>
+          <div v-if="currentQaSeq === q.seq" class="sym-panel">
+            <button v-for="s in MATH_SYMBOLS" :key="s" type="button"
+                    class="sym-btn" @click="insertSymbol(s, q.seq)">{{ s }}</button>
+          </div>
+          <textarea :placeholder="'在此输入你的作答...'"
+                    rows="3" :disabled="state === 'submitting'"
+                    v-model="answers[q.seq]"></textarea>
+        </div>
+      </div>
+
+      <div class="actions" v-if="questions.length > 0">
+        <button :disabled="state === 'submitting'" @click="submit">
+          {{ state === 'submitting' ? 'AI 批改中...' : '✅ 提交批改' }}
+        </button>
+      </div>
+
+      <div class="advance-area">
+        <button class="advance-btn" :disabled="advancing" @click="nextRound">
+          {{ advancing ? '⏳ 生成中...' : '⏭️ 下一轮学习' }}
+        </button>
+        <p v-if="advanceMsg" class="advance-msg">{{ advanceMsg }}</p>
+        <p class="hint">点击后预生成下一轮练习题(不影响已记录的学习进度,重复点击不会重复生成)。</p>
+      </div>
+    </template>
+
+    <div v-else-if="state === 'done'" class="result">
+      <h3>批改结果</h3>
+      <pre>{{ result }}</pre>
+      <p class="hint">进度已自动写入学习系统(掌握度↑ / 错题进错题本)。</p>
+      <button @click="fetchToday">继续下一批</button>
+    </div>
+  </div>
+</template>
+
+<style scoped>
+.quiz-wrapper { max-width: 720px; margin: 0 auto; }
+.sub { color: #888; margin-top: -6px; }
+.status { padding: 20px; text-align: center; color: #666; }
+.status.error { color: #d93025; }
+.hint { font-size: 13px; color: #999; }
+.question { border: 1px solid #e0e0e0; border-radius: 10px; padding: 16px; margin: 14px 0; background: #fff; }
+.qhead { display: flex; gap: 8px; margin-bottom: 6px; }
+.badge { background: #3eaf7c; color: #fff; padding: 2px 10px; border-radius: 12px; font-size: 12px; }
+.qtype { background: #f0f0f0; padding: 2px 10px; border-radius: 12px; font-size: 12px; color: #555; }
+.qtext { font-size: 15px; margin: 8px 0; }
+.options { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; }
+.opt { display: flex; gap: 8px; align-items: center; border: 1px solid #eee; padding: 8px 12px; border-radius: 8px; cursor: pointer; }
+.opt:hover { background: #f6f6f6; }
+textarea { width: 100%; border: 1px solid #ddd; border-radius: 8px; padding: 8px; font-size: 14px; font-family: inherit; }
+.qa-area { display: flex; flex-direction: column; gap: 6px; }
+.sym-toolbar { display: flex; justify-content: flex-start; }
+.sym-toggle { background: #f0f0f0; color: #444; padding: 5px 12px; border-radius: 6px; font-size: 13px; cursor: pointer; }
+.sym-toggle:hover { background: #e4e4e4; }
+.sym-panel { display: flex; flex-wrap: wrap; gap: 4px; padding: 6px; background: #fafafa; border: 1px solid #eee; border-radius: 8px; }
+.sym-btn { background: #fff; border: 1px solid #ddd; border-radius: 5px; padding: 4px 8px; font-size: 14px; cursor: pointer; min-width: 36px; }
+.sym-btn:hover { background: #3eaf7c; color: #fff; border-color: #3eaf7c; }
+.actions { text-align: center; margin-top: 16px; }
+.advance-area { text-align: center; margin-top: 10px; padding-top: 10px; border-top: 1px dashed #ddd; }
+.advance-btn { background: #fff; color: #3eaf7c; border: 1px solid #3eaf7c; padding: 8px 20px; border-radius: 8px; font-size: 14px; cursor: pointer; }
+.advance-btn:hover { background: #3eaf7c; color: #fff; }
+.advance-msg { color: #3eaf7c; font-size: 13px; margin-top: 6px; }
+button { background: #3eaf7c; color: #fff; border: none; padding: 10px 24px; border-radius: 8px; font-size: 15px; cursor: pointer; }
+button:hover { opacity: .9; }
+button:disabled { opacity: .5; cursor: not-allowed; }
+.result { border: 1px solid #3eaf7c; border-radius: 10px; padding: 16px; }
+.result pre { white-space: pre-wrap; background: #f6f6f6; padding: 12px; border-radius: 8px; }
+</style>
