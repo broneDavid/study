@@ -154,6 +154,10 @@ def mistakes_to_markdown():
     lines = []
     lines.append("# ❌ 错题本")
     lines.append("")
+    lines.append("> 逐题重练:先回忆 → 展开核对 → 自评「记住了/还不会」。标记解决后自动移出待办。")
+    lines.append("")
+    lines.append("<MistakesReplayComponent />")
+    lines.append("")
     total = 0
     unresolved = 0
     for subj in SUBJECTS:
@@ -380,6 +384,82 @@ def _mastery_cards():
     out.append('</div>')
     return "\n".join(out)
 
+def _history_days():
+    """读取打卡历史。返回 (days_dict, streak)。"""
+    hist = load_json(os.path.join(STUDY_DIR, "history.json"), {"days": []})
+    days = {}
+    for d in hist.get("days", []):
+        if d.get("checkin"):
+            days[d.get("date")] = d.get("mode", "standard")
+    return days
+
+def _calendar_heatmap(months_back=3):
+    """生成最近 N 个月的打卡日历热力图(纯 HTML,无 JS 依赖)。
+    返回 (html, streak, total)。"""
+    from datetime import date, timedelta
+    days = _history_days()
+    today, _ = _today_shanghai()
+    ty, tm, td = map(int, today.split("-"))
+    today_d = date(ty, tm, td)
+
+    # 计算连续天数(从今天往回,今天没打从昨天开始)
+    streak = 0
+    cur = today_d
+    if cur.strftime("%Y-%m-%d") not in days:
+        cur -= timedelta(days=1)
+    while cur.strftime("%Y-%m-%d") in days:
+        streak += 1
+        cur -= timedelta(days=1)
+
+    # 收集最近 months_back 个月的打卡日
+    start = today_d - timedelta(days=30 * months_back)
+    cell_html = []
+    total = 0
+    cur = start
+    while cur <= today_d:
+        key = cur.strftime("%Y-%m-%d")
+        is_today = (key == today)
+        if key in days:
+            total += 1
+            bg = "#3eaf7c" if is_today else "#7ecba0"
+            cell_html.append(f'<div title="{key}" style="background:{bg};border-radius:4px;height:18px;min-width:10px;flex:1;"></div>')
+        else:
+            bg = "#f0f0f0" if is_today else "#fafafa"
+            border = "2px solid #e6a23c" if is_today else "1px solid #eee"
+            cell_html.append(f'<div title="{key}" style="background:{bg};border:{border};border-radius:4px;height:18px;min-width:10px;flex:1;"></div>')
+        cur += timedelta(days=1)
+    html = ('<div style="display:flex;gap:3px;flex-wrap:nowrap;overflow-x:auto;padding:4px 0;">'
+            + "".join(cell_html) + '</div>')
+    return html, streak, total
+
+def _milestones():
+    """里程碑徽章:基于打卡天数/掌握度/错题清零判定。返回 HTML。"""
+    hist = load_json(os.path.join(STUDY_DIR, "history.json"), {"days": []})
+    total_days = sum(1 for d in hist.get("days", []) if d.get("checkin"))
+    _, streak, _ = _calendar_heatmap()
+    prog = load_json(os.path.join(STUDY_DIR, "progress", "progress.json"), {"subjects": {}})
+    subs = prog.get("subjects", {})
+    mastery = {s: subs.get(s, {}).get("mastery", 0) for s in SUBJECTS}
+
+    def badge(emoji, name, done, tip=""):
+        if done:
+            return (f'<div style="background:#e8f5e9;border:1px solid #3eaf7c;border-radius:10px;padding:10px;text-align:center;">'
+                    f'<div style="font-size:22px;">{emoji}</div><div style="font-size:13px;font-weight:600;color:#2e7d32;">{name}</div>'
+                    f'<div style="font-size:11px;color:#888;">已达成</div></div>')
+        return (f'<div style="background:#fafafa;border:1px dashed #ddd;border-radius:10px;padding:10px;text-align:center;opacity:.7;">'
+                f'<div style="font-size:22px;">{emoji}</div><div style="font-size:13px;color:#888;">{name}</div>'
+                f'<div style="font-size:11px;color:#aaa;">{tip}</div></div>')
+
+    out = ['<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;">']
+    out.append(badge("🔥", "连续 7 天", streak >= 7, f"还差 {max(0,7-streak)} 天"))
+    out.append(badge("⚡", "连续 14 天", streak >= 14, f"还差 {max(0,14-streak)} 天"))
+    out.append(badge("🏆", "连续 30 天", streak >= 30, f"还差 {max(0,30-streak)} 天"))
+    out.append(badge("📘", "高数 ≥50%", mastery.get("高等数学", 0) >= 50, f"当前 {mastery.get('高等数学',0)}%"))
+    out.append(badge("⚙️", "机械 ≥70%", mastery.get("机械原理", 0) >= 70, f"当前 {mastery.get('机械原理',0)}%"))
+    out.append(badge("📝", "累计 30 天", total_days >= 30, f"当前 {total_days} 天"))
+    out.append('</div>')
+    return "\n".join(out)
+
 def daily_to_markdown():
     """每日学习页:倒计时 + 今日任务 + 今日科目 + 到期复习 + 今日知识点 + 在线小测。"""
     today, wd = _today_shanghai()
@@ -399,31 +479,18 @@ def daily_to_markdown():
     lines.append("📌 每天 30 分钟:知识点 → 小测 → 复习错题。本页每日自动更新。")
     lines.append("")
 
-    # 今日任务清单
+    # 今日科目(按轮换表,提前取值供任务卡跳转使用)
+    subj_a, subj_b = WEEK_ROTATION[wd]
+
+    # 今日任务(实时组件:状态 + 打卡交互 + 跳转)
     lines.append("## ✅ 今日任务")
     lines.append("")
-    lines.append('<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;">')
-    task_defs = [
-        ("☀️ 晨间打卡", "checkin", "#3eaf7c"),
-        ("📚 知识点", "lesson", "#3eaf7c"),
-        ("📝 每日小测", "quiz", "#3eaf7c"),
-        ("🔁 复盘复习", "review", "#3eaf7c"),
-    ]
-    for label, key, color in task_defs:
-        done = flags.get(key, False)
-        badge = "✅ 已完成" if done else "⏳ 未完成"
-        bg = "#e8f5e9" if done else "#fff8e1"
-        border = "#3eaf7c" if done else "#e6a23c"
-        lines.append(f'<div style="background:{bg};border:1px solid {border};border-radius:10px;padding:10px;text-align:center;">'
-                     f'<div style="font-size:14px;">{label}</div>'
-                     f'<div style="font-size:13px;font-weight:600;color:{border};">{badge}</div></div>')
-    lines.append('</div>')
+    lines.append("<DailyTasksComponent />")
     lines.append("")
 
     # 今日科目(按轮换表)
     lines.append("## 📖 今日科目")
     lines.append("")
-    subj_a, subj_b = WEEK_ROTATION[wd]
     if wd == 7:  # 周日:周总结 + 错题总复习,无新知识点
         lines.append(f"> 今天是 **周日总结日**:{subj_a} + {subj_b}。没有新知识点,复习本周内容为主。")
     else:
@@ -452,10 +519,62 @@ def daily_to_markdown():
         lines.append("> 🎉 今天没有到期复习,轻松学新知识!")
     lines.append("")
 
-    # 今日知识点(非周日)
-    if wd != 7:
-        lines.append("## 📚 今日知识点")
+    # 今日知识点(带锚点,任务卡"知识点"跳这里;周日也显示,作为本周回顾)
+    lines.append('<a id="today-lesson"></a>')
+    lines.append("## 📚 今日知识点")
+    lines.append("")
+    if wd == 7:
+        lines.append("**今天是周总结日,没有新知识点——回顾一下最近的要点:**")
         lines.append("")
+        # 周日:从所有科目取最近创建的知识点做回顾
+        all_items = []
+        for s in SUBJECTS:
+            d = load_json(os.path.join(STUDY_DIR, "knowledge", f"{s}.json"), {"items": []})
+            for it in d.get("items", []):
+                all_items.append((s, it))
+        all_items.sort(key=lambda x: x[1].get("created", ""), reverse=True)
+        for subj, it in all_items[:5]:
+            icon = SUBJECT_ICONS.get(subj, "📘")
+            title = it.get("title", "")
+            m = it.get("mastery", 0)
+            created = it.get("created", "")
+            content = (it.get("content", "") or "")[:200]
+            example = it.get("example", "")
+            lines.append(f"### {icon} {subj} · {title}")
+            lines.append("")
+            meta = [f"**掌握度:** {m}%"]
+            if created:
+                meta.append(f"**创建:** {created}")
+            lines.append(f"> {' | '.join(meta)}")
+            lines.append("")
+            bars = "█" * max(0, round(m / 10)) + "░" * max(0, 10 - round(m / 10))
+            lines.append(f"> 掌握度进度: {bars}")
+            lines.append("")
+            if content:
+                lines.append("**核心内容:**")
+                lines.append("")
+                lines.append(content)
+                lines.append("")
+            diagram = _match_diagram(subj, title)
+            if diagram:
+                lines.append("**图示:**")
+                lines.append("")
+                lines.append(f"![{title} 图示](./assets/diagrams/{diagram})")
+                lines.append("")
+            if example:
+                lines.append("<details class=\"example-box\">")
+                lines.append("<summary>💡 点击展示例题答案</summary>")
+                lines.append("")
+                lines.append(example)
+                lines.append("")
+                lines.append("</details>")
+                lines.append("")
+            lines.append("---")
+            lines.append("")
+        if not all_items:
+            lines.append("> 知识库还是空的,等明天课程推送后自动补充。")
+        lines.append("")
+    else:
         lines.append(f"**今日科目 {SUBJECT_ICONS.get(subj_a,'')} {subj_a}** 最新知识点:")
         lines.append("")
         data = load_json(os.path.join(STUDY_DIR, "knowledge", f"{subj_a}.json"), {"items": []})
@@ -466,14 +585,37 @@ def daily_to_markdown():
             content = (it.get("content", "") or "")[:250]
             example = it.get("example", "")
             m = it.get("mastery", 0)
+            created = it.get("created", "")
             lines.append(f"### {title}")
-            lines.append(f"> 掌握 {m}% · 创建 {it.get('created','')}")
+            lines.append("")
+            meta = [f"**掌握度:** {m}%"]
+            if created:
+                meta.append(f"**创建:** {created}")
+            lines.append(f"> {' | '.join(meta)}")
+            lines.append("")
+            bars = "█" * max(0, round(m / 10)) + "░" * max(0, 10 - round(m / 10))
+            lines.append(f"> 掌握度进度: {bars}")
+            lines.append("")
             if content:
+                lines.append("**核心内容:**")
                 lines.append("")
                 lines.append(content)
-            if example:
                 lines.append("")
-                lines.append(f"> **例题:** {example}")
+            diagram = _match_diagram(subj_a, title)
+            if diagram:
+                lines.append("**图示:**")
+                lines.append("")
+                lines.append(f"![{title} 图示](./assets/diagrams/{diagram})")
+                lines.append("")
+            if example:
+                lines.append("<details class=\"example-box\">")
+                lines.append("<summary>💡 点击展示例题答案</summary>")
+                lines.append("")
+                lines.append(example)
+                lines.append("")
+                lines.append("</details>")
+                lines.append("")
+            lines.append("---")
             lines.append("")
             shown += 1
         if shown == 0:
@@ -484,6 +626,21 @@ def daily_to_markdown():
     lines.append("## 📊 掌握度速览")
     lines.append("")
     lines.append(_mastery_cards())
+    lines.append("")
+
+    # 打卡日历热力图 + 连续天数
+    cal_html, streak, cal_total = _calendar_heatmap()
+    lines.append("## 📅 打卡日历(近 90 天)")
+    lines.append("")
+    lines.append(f"> 🔥 **连续学习 {streak} 天** · 近 90 天打卡 {cal_total} 天 · 绿=已打卡 橙框=今天")
+    lines.append("")
+    lines.append(cal_html)
+    lines.append("")
+
+    # 里程碑徽章
+    lines.append("## 🏅 里程碑")
+    lines.append("")
+    lines.append(_milestones())
     lines.append("")
 
     # 在线小测
@@ -515,7 +672,14 @@ def home_to_markdown():
     lines.append("")
     lines.append("# 启的考研笔记 🏷️")
     lines.append("")
-    lines.append("> **考研备考:** 数学一 · 机械原理 · 英语一 · 炼油化工设备\n> **考研倒计时: 126 天 · 强化阶段**\n📌 本网站由学习系统自动生成, 每日更新。")
+    days, stage = _exam_countdown()
+    lines.append("> **考研备考:** 数学一 · 机械原理 · 英语一 · 炼油化工设备\\n> **考研倒计时: {} 天 · {}阶段**\\n📌 本网站由学习系统自动生成, 每日更新。".format(days, stage))
+    lines.append("")
+
+    # 今日行动条(实时状态组件)
+    lines.append("## ✅ 今日行动")
+    lines.append("")
+    lines.append("<DailyTasksComponent />")
     lines.append("")
 
     # 掌握度速览卡(HTML)
@@ -534,6 +698,19 @@ def home_to_markdown():
                      f'<div style="height:6px;background:#eee;border-radius:3px;margin-top:6px;">'
                      f'<div style="height:100%;width:{m}%;background:{color};border-radius:3px;"></div></div></div>')
     lines.append('</div>')
+    lines.append("")
+
+    # 打卡日历 + 里程碑
+    cal_html, streak, cal_total = _calendar_heatmap()
+    lines.append("## 📅 打卡日历(近 90 天)")
+    lines.append("")
+    lines.append("> 🔥 **连续学习 {} 天** · 近 90 天打卡 {} 天 · 绿=已打卡 橙框=今天".format(streak, cal_total))
+    lines.append("")
+    lines.append(cal_html)
+    lines.append("")
+    lines.append("## 🏅 里程碑")
+    lines.append("")
+    lines.append(_milestones())
     lines.append("")
 
     # 今日知识点练习
@@ -592,6 +769,12 @@ def main():
     STUDY_DIR = args.study_dir
     OUT_DIR = args.out
     WEEKLY_DIR = os.path.join(args.study_dir, "archive", "weekly")
+
+    # ⚠️ fail-fast:学习数据不存在时禁止生成空壳站(防 Actions runner 覆盖真站)
+    if not os.path.isdir(STUDY_DIR) or not os.path.isdir(os.path.join(STUDY_DIR, "knowledge")):
+        print(f"❌ 学习数据目录不存在或知识库缺失: {STUDY_DIR}")
+        print("   本生成器只在有学习数据的机器上运行(本地 y7000)。真实部署: ./scripts/build.sh deploy")
+        sys.exit(2)
 
     # 清理上一次生成(仅删除我们生成的文件)
     for sub in ["subjects", "reports", "assets/weekly"]:

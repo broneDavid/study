@@ -34,6 +34,7 @@ if [ "${1:-}" = "deploy" ]; then
   DEPLOY=/tmp/ghpages_deploy_$$
   rm -rf "$DEPLOY"; mkdir -p "$DEPLOY"
   cp -r docs/.vitepress/dist/* "$DEPLOY/"
+  touch "$DEPLOY/.nojekyll"   # 关键:禁用 GitHub Pages 的 Jekyll 处理(防 {{ }} 导致整站404)
   cd "$DEPLOY"
   git init -q -b gh-pages
   git config user.name "broneDavid"

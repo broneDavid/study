@@ -1,5 +1,6 @@
 <script setup>
 import { ref, onMounted } from 'vue'
+import { fetchWithTimeout, stashAnswers, restoreAnswers, clearStash } from './fetchUtil.js'
 
 // API 公网地址(VPS nginx 反代到 y7000)
 const API_BASE = 'https://hermes.4587693.xyz/quiz'
@@ -12,11 +13,14 @@ const answers = ref({})      // seq -> 用户选择/填答
 const date = ref('')
 const result = ref('')
 const errorMsg = ref('')
+const draftNotice = ref('')  // 暂存提示
 
 async function fetchToday() {
+  state.value = 'loading'
+  errorMsg.value = ''
   try {
     // today 为公开读(无答案),无需 token
-    const r = await fetch(`${API_BASE}/today`)
+    const r = await fetchWithTimeout(`${API_BASE}/today`)
     if (!r.ok) throw new Error('HTTP ' + r.status)
     const d = await r.json()
     date.value = d.date
@@ -24,6 +28,15 @@ async function fetchToday() {
     // 预填答案对象
     answers.value = {}
     questions.value.forEach(q => answers.value[q.seq] = q.type === 'choice' ? '' : '')
+    // 恢复暂存的未提交答案(上次提交失败时存下的)
+    const draft = restoreAnswers(date.value || 'today')
+    if (draft && Object.keys(draft).length) {
+      let restored = 0
+      questions.value.forEach(q => {
+        if (draft[q.seq]) { answers.value[q.seq] = draft[q.seq]; restored++ }
+      })
+      if (restored > 0) draftNotice.value = `📝 已恢复上次未提交的 ${restored} 题答案,可直接提交或修改`
+    }
     state.value = 'ready'
   } catch (e) {
     state.value = 'error'
@@ -44,18 +57,21 @@ async function submit() {
   const answerText = '答案：' + parts.join(' ')
 
   state.value = 'submitting'
+  // 提交前先暂存(万一失败刷新后不丢答案)
+  stashAnswers(date.value || 'today', answers.value)
   try {
-    const r = await fetch(`${API_BASE}/grade`, {
+    const r = await fetchWithTimeout(`${API_BASE}/grade`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'X-Quiz-Token': _t },
       body: JSON.stringify({ answer: answerText }),
-    })
+    }, 15000) // 批改可能较慢,给 15s
     const d = await r.json()
     result.value = d.result || '(无结果)'
     state.value = 'done'
+    if (d.ok) clearStash(date.value || 'today')
   } catch (e) {
     state.value = 'error'
-    errorMsg.value = '提交失败: ' + e.message
+    errorMsg.value = '提交失败: ' + e.message + '(答案已暂存,刷新后可恢复,不会丢失)'
   }
 }
 
@@ -84,7 +100,7 @@ async function nextRound() {
   advancing.value = true
   advanceMsg.value = ''
   try {
-    const r = await fetch(`${API_BASE}/advance`, {
+    const r = await fetchWithTimeout(`${API_BASE}/advance`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'X-Quiz-Token': _t },
       body: JSON.stringify({ count: 6 }),
@@ -119,10 +135,11 @@ onMounted(fetchToday)
     </div>
 
     <template v-else-if="state === 'ready' || state === 'submitting'">
+      <p v-if="draftNotice" class="draft-notice">{{ draftNotice }}</p>
       <p v-if="questions.length === 0" class="status">
         今天暂时没有待批改的小测题。<br>
-        小测每天 14:00 由学习系统 @Studyingschedulebot 推送,答过的题会自动批改。<br>
-        你也可先在下方复习区手动练题。
+        小测每天 08:00 由学习系统 @Studyingschedulebot 自动出题,答过的题会自动批改。<br>
+        你也可点击下方「⏭️ 下一轮学习」生成新题练手。
       </p>
 
       <div v-for="q in questions" :key="q.seq" class="question">
@@ -189,6 +206,7 @@ onMounted(fetchToday)
 .status { padding: 20px; text-align: center; color: #666; }
 .status.error { color: #d93025; }
 .hint { font-size: 13px; color: #999; }
+.draft-notice { background: #fff8e1; border: 1px solid #e6a23c; color: #b26a00; padding: 8px 12px; border-radius: 8px; font-size: 13px; margin: 8px 0; }
 .question { border: 1px solid #e0e0e0; border-radius: 10px; padding: 16px; margin: 14px 0; background: #fff; }
 .qhead { display: flex; gap: 8px; margin-bottom: 6px; }
 .badge { background: #3eaf7c; color: #fff; padding: 2px 10px; border-radius: 12px; font-size: 12px; }
