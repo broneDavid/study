@@ -4,7 +4,7 @@ layout: home
 
 # 启的考研笔记 🏷️
 
-> **考研备考:** 数学一 · 机械原理 · 英语一 · 炼油化工设备\n> **考研倒计时: 125 天 · 强化阶段**\n📌 本网站由学习系统自动生成, 每日更新。
+> **考研备考:** 数学一 · 机械原理 · 英语一 · 炼油化工设备\n> **考研倒计时: 124 天 · 强化阶段**\n📌 本网站由学习系统自动生成, 每日更新。
 
 **👉 今天学什么? 去 [每日学习](/daily) 看今日任务与知识点。**
 
@@ -12,7 +12,7 @@ layout: home
 
 <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;">
 <a href="/study/subjects/高等数学" style="display:block;background:#fff;border:1px solid #e0e0e0;border-radius:10px;padding:14px;text-decoration:none;color:#333;box-shadow:0 1px 3px rgba(0,0,0,.06);"><div style="font-size:16px;font-weight:600;">📘 高等数学</div><div style="font-size:13px;color:#888;margin-top:4px;">14 个知识点</div></a>
-<a href="/study/subjects/机械原理" style="display:block;background:#fff;border:1px solid #e0e0e0;border-radius:10px;padding:14px;text-decoration:none;color:#333;box-shadow:0 1px 3px rgba(0,0,0,.06);"><div style="font-size:16px;font-weight:600;">⚙️ 机械原理</div><div style="font-size:13px;color:#888;margin-top:4px;">10 个知识点</div></a>
+<a href="/study/subjects/机械原理" style="display:block;background:#fff;border:1px solid #e0e0e0;border-radius:10px;padding:14px;text-decoration:none;color:#333;box-shadow:0 1px 3px rgba(0,0,0,.06);"><div style="font-size:16px;font-weight:600;">⚙️ 机械原理</div><div style="font-size:13px;color:#888;margin-top:4px;">12 个知识点</div></a>
 <a href="/study/subjects/英语" style="display:block;background:#fff;border:1px solid #e0e0e0;border-radius:10px;padding:14px;text-decoration:none;color:#333;box-shadow:0 1px 3px rgba(0,0,0,.06);"><div style="font-size:16px;font-weight:600;">🇬🇧 英语</div><div style="font-size:13px;color:#888;margin-top:4px;">10 个知识点</div></a>
 <a href="/study/subjects/炼油化工设备" style="display:block;background:#fff;border:1px solid #e0e0e0;border-radius:10px;padding:14px;text-decoration:none;color:#333;box-shadow:0 1px 3px rgba(0,0,0,.06);"><div style="font-size:16px;font-weight:600;">🏭 炼油化工设备</div><div style="font-size:13px;color:#888;margin-top:4px;">6 个知识点</div></a>
 </div>

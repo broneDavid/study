@@ -137,7 +137,7 @@ onMounted(fetchToday)
       <p v-if="draftNotice" class="draft-notice">{{ draftNotice }}</p>
       <p v-if="questions.length === 0" class="status">
         今天暂时没有待批改的小测题。<br>
-        小测每天 08:00 由学习系统 @Studyingschedulebot 自动出题,答过的题会自动批改。<br>
+        小测每天 07:30 / 13:30 / 19:00 由学习系统 @Studyingschedulebot 自动出题,答过的题会自动批改。<br>
         你也可点击下方「⏭️ 下一轮学习」生成新题练手。
       </p>
 
