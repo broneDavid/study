@@ -212,7 +212,7 @@ onMounted(fetchToday)
 .status.error { color: #d93025; }
 .hint { font-size: 13px; color: #999; }
 .draft-notice { background: #fff8e1; border: 1px solid #e6a23c; color: #b26a00; padding: 8px 12px; border-radius: 8px; font-size: 13px; margin: 8px 0; }
-.question { border: 1px solid rgba(255,255,255,.6); border-radius: 16px; padding: 16px; margin: 12px 0; background: rgba(255,255,255,.72); box-shadow: 0 2px 16px rgba(0,0,0,.06); -webkit-backdrop-filter: saturate(180%) blur(20px); backdrop-filter: saturate(180%) blur(20px); }
+.question { border: 1px solid rgba(255,255,255,.6); border-radius: 16px; padding: 16px; margin: 12px 0; background: rgba(255,255,255,.94); box-shadow: 0 2px 16px rgba(0,0,0,.06); }
 .qhead { display: flex; gap: 8px; margin-bottom: 6px; }
 .badge { background: rgba(0,113,227,.12); color: #0071e3; color: #fff; padding: 2px 10px; border-radius: 12px; font-size: 12px; }
 .qtype { background: #f0f0f0; padding: 2px 10px; border-radius: 12px; font-size: 12px; color: #555; }

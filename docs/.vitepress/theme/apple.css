@@ -66,6 +66,8 @@
     --vp-c-brand-1: #0a84ff;
   }
 }
+html.dark .app-card { background: rgba(28,28,30,.94); border-color: rgba(255,255,255,.06); }
+@media (prefers-color-scheme: dark) { :root:not(.light) .app-card { background: rgba(28,28,30,.94); border-color: rgba(255,255,255,.06); } }
 html.dark {
   --app-bg: #000;
   --app-grad-1: #0a0a0f;
@@ -98,12 +100,11 @@ body {
 
 /* ========== 通用组件 ========== */
 .app-card {
-  background: var(--app-card);
-  -webkit-backdrop-filter: saturate(180%) blur(var(--app-blur));
-  backdrop-filter: saturate(180%) blur(var(--app-blur));
-  border: 1px solid var(--app-border);
+  /* 实色背景(非核心卡片,滚动性能优先;毛玻璃仅保留导航/步骤条) */
+  background: rgba(255, 255, 255, 0.92);
+  border: 1px solid rgba(0, 0, 0, 0.04);
   border-radius: var(--app-radius);
-  box-shadow: var(--app-shadow);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04), 0 4px 14px rgba(0, 0, 0, 0.05);
 }
 .app-pill {
   border-radius: 980px;
@@ -162,10 +163,10 @@ body {
 /* 数字等宽(掌握度/倒计时对齐) */
 .num, .stat, .mastery-pct { font-variant-numeric: tabular-nums; }
 
-/* ========== 导航/侧边栏毛玻璃 ========== */
+/* ========== 导航/侧边栏毛玻璃(唯一保留的 blur 元素) ========== */
 .VPNavBar, .VPSidebar {
-  -webkit-backdrop-filter: saturate(180%) blur(var(--app-blur));
-  backdrop-filter: saturate(180%) blur(var(--app-blur));
+  -webkit-backdrop-filter: blur(var(--app-blur));
+  backdrop-filter: blur(var(--app-blur));
   background: var(--app-card) !important;
 }
 

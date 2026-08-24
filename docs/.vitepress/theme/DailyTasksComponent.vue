@@ -167,8 +167,7 @@ const MODE_LABELS = { light: '轻量', standard: '标准', intensive: '加强', 
 .steps { display: flex; flex-direction: column; }
 .step {
   display: flex; align-items: center; gap: 14px;
-  background: rgba(255,255,255,.72);
-  -webkit-backdrop-filter: saturate(180%) blur(20px); backdrop-filter: saturate(180%) blur(20px);
+  background: rgba(255,255,255,.94);
   border: 1px solid rgba(255,255,255,.6);
   border-radius: 18px; box-shadow: 0 4px 24px rgba(0,0,0,.08);
   padding: 14px 16px; margin-bottom: 10px;
