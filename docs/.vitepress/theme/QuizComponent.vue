@@ -1,11 +1,9 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { fetchWithTimeout, stashAnswers, restoreAnswers, clearStash } from './fetchUtil.js'
+import { API_BASE, QUIZ_TOKEN } from './apiConfig.js'
 
-// API 公网地址(VPS nginx 反代到 y7000)
-const API_BASE = 'https://hermes.4587693.xyz/quiz'
-// 轻量访问 token(用于限制滥用;含在下面前端用 .map 编码,防爬虫直接抓)
-const _t = ['31','b7','a7','46','3f','d9','db','60','c4','ff','30','bd','b9','4e','a1','fa','fd','f4','d3','97','bf','81','ab','7c'].join('')
+// 轻量访问 token(集中管理于 apiConfig.js)
 
 const state = ref('loading') // loading | ready | submitting | done | error
 const questions = ref([])
@@ -63,7 +61,7 @@ async function submit() {
   try {
     const r = await fetchWithTimeout(`${API_BASE}/grade`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'X-Quiz-Token': _t },
+      headers: { 'Content-Type': 'application/json', 'X-Quiz-Token': QUIZ_TOKEN },
       body: JSON.stringify({ answer: answerText }),
     }, 15000) // 批改可能较慢,给 15s
     const d = await r.json()
@@ -81,7 +79,7 @@ function isCurrent(q) {
 }
 
 // 数学符号面板(需求2): 点击插入到当前问答题答案
-const MATH_SYMBOLS = ['√', 'π', '±', '×', '÷', '≤', '≥', '∞', '∑', '∫', '≠', '≈', 'θ', 'α', 'β', '°', '²', '³', 'x²', 'x³', 'xⁿ', '¹⁄₂', '⁻¹', '→', 'Δ', 'λ', 'μ', 'π/2', '√x', 'sin', 'cos', 'tan', 'log', 'ln', 'lim']
+const MATH_SYMBOLS = ['√', 'π', '±', '×', '÷', '≤', '≥', '∞', '∑', '∫', '≠', '≈', 'θ', 'α', 'β', '°', '²', '³', 'x²', 'x³', 'x^n', '1/2', '-1', '→', 'Δ', 'λ', 'μ', 'π/2', '√x', 'sin', 'cos', 'tan', 'log', 'ln', 'lim']
 const currentQaSeq = ref(null)
 
 function insertSymbol(sym, seq) {
@@ -97,15 +95,15 @@ function showSymbolPanel(seq) {
 const advancing = ref(false)
 const advanceMsg = ref('')
 async function nextRound() {
-  if (!confirm('生成下一轮学习题目？\n(将预取新的练习题,不影响已完成的进度记录)')) return
+  if (!confirm('生成下一轮学习题目？\n(需调 AI 出题,约 30-120 秒,请耐心等待)')) return
   advancing.value = true
   advanceMsg.value = ''
   try {
     const r = await fetchWithTimeout(`${API_BASE}/advance`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'X-Quiz-Token': _t },
+      headers: { 'Content-Type': 'application/json', 'X-Quiz-Token': QUIZ_TOKEN },
       body: JSON.stringify({ count: 6 }),
-    })
+    }, 180000) // AI 出题慢,给 3 分钟(此前 10s 超时导致 499 断开)
     const d = await r.json()
     if (d.ok) {
       advanceMsg.value = d.idempotent ? '✅ 已有题目,无需重复生成' : `✅ 下一轮题目已就绪 (${d.pending_now || ''} 道)`
@@ -170,7 +168,8 @@ onMounted(fetchToday)
           </div>
           <!-- v-show 而非 v-if:面板在挂载时即渲染(仅隐藏),避免 iPad WebKit
                首次 v-if 插入时符号空白、点击后才显示的渲染 bug -->
-          <div v-show="currentQaSeq === qi" class="sym-panel">
+          <!-- 符号面板:用 visibility 常驻渲染(不 display:none),iOS 首次展开即显示全部字形 -->
+          <div :class="['sym-panel', { open: currentQaSeq === qi }]">
             <button v-for="s in MATH_SYMBOLS" :key="s" type="button"
                     class="sym-btn" @click="insertSymbol(s, qi)">{{ s }}</button>
           </div>
@@ -191,7 +190,7 @@ onMounted(fetchToday)
           {{ advancing ? '⏳ 生成中...' : '⏭️ 下一轮学习' }}
         </button>
         <p v-if="advanceMsg" class="advance-msg">{{ advanceMsg }}</p>
-        <p class="hint">点击后预生成下一轮练习题(不影响已记录的学习进度,重复点击不会重复生成)。</p>
+        <p class="hint">点击后调用 AI 生成下一轮练习题(约 30-120 秒,耐心等待;重复点击不会重复生成)。</p>
       </div>
     </template>
 
@@ -224,8 +223,9 @@ textarea { width: 100%; border: 1px solid #ddd; border-radius: 8px; padding: 8px
 .sym-toolbar { display: flex; justify-content: flex-start; }
 .sym-toggle { background: #f0f0f0; color: #444; padding: 5px 12px; border-radius: 6px; font-size: 13px; cursor: pointer; }
 .sym-toggle:hover { background: #e4e4e4; }
-.sym-panel { display: flex; flex-wrap: wrap; gap: 4px; padding: 6px; background: #fafafa; border: 1px solid #eee; border-radius: 8px; }
-.sym-btn { background: #fff; border: 1px solid #ddd; border-radius: 5px; padding: 4px 8px; font-size: 14px; cursor: pointer; min-width: 36px; }
+.sym-panel { display: flex; flex-wrap: wrap; gap: 4px; padding: 6px; background: #fafafa; border: 1px solid #eee; border-radius: 8px; height: 0; margin: 0; overflow: hidden; visibility: hidden; }
+.sym-panel.open { height: auto; margin: 0 0 8px; visibility: visible; }
+.sym-btn { background: #fff; border: 1px solid #ddd; border-radius: 5px; padding: 4px 8px; font-size: 15px; cursor: pointer; min-width: 36px; font-family: "SF Pro Text", -apple-system, "PingFang SC", "Segoe UI Symbol", "Apple Symbols", sans-serif; }
 .sym-btn:hover { background: #3eaf7c; color: #fff; border-color: #3eaf7c; }
 .actions { text-align: center; margin-top: 16px; }
 .advance-area { text-align: center; margin-top: 10px; padding-top: 10px; border-top: 1px dashed #ddd; }

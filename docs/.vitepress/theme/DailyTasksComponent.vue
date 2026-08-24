@@ -1,9 +1,8 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { fetchWithTimeout } from './fetchUtil.js'
+import { API_BASE, QUIZ_TOKEN } from './apiConfig.js'
 
-const API_BASE = 'https://hermes.4587693.xyz/quiz'
-const _t = ['31','b7','a7','46','3f','d9','db','60','c4','ff','30','bd','b9','4e','a1','fa','fd','f4','d3','97','bf','81','ab','7c'].join('')
 
 const loading = ref(true)
 const status = ref(null)
@@ -47,7 +46,7 @@ async function doCheckin(m) {
   try {
     const r = await fetchWithTimeout(`${API_BASE}/checkin`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'X-Quiz-Token': _t },
+      headers: { 'Content-Type': 'application/json', 'X-Quiz-Token': QUIZ_TOKEN },
       body: JSON.stringify({ mode: m }),
     })
     const d = await r.json()

@@ -21,41 +21,56 @@ export default defineConfig({
   },
 
   themeConfig: {
-    // 导航
+    // 导航(高频 4 项,低频项在侧边栏/门户页)
     nav: [
       { text: '每日学习', link: '/daily' },
-      { text: '首页', link: '/' },
       { text: '在线小测', link: '/quiz' },
-      { text: '学习计划', link: '/plan' },
-      { text: '学习进度', link: '/progress' },
       { text: '错题本', link: '/mistakes' },
       { text: '每周周报', link: '/reports/' },
     ],
 
-    // 侧边栏
-    sidebar: [
-      {
-        text: '📊 学习总览',
-        items: [
-          { text: '📅 每日学习', link: '/daily' },
-          { text: '首页仪表盘', link: '/' },
-          { text: '在线小测', link: '/quiz' },
-          { text: '学习计划', link: '/plan' },
-          { text: '学习进度', link: '/progress' },
-          { text: '错题本', link: '/mistakes' },
-          { text: '每周周报', link: '/reports/' },
-        ],
-      },
-      {
-        text: '📘 学科笔记',
-        items: [
-          { text: '高等数学', link: '/subjects/高等数学' },
-          { text: '机械原理', link: '/subjects/机械原理' },
-          { text: '英语', link: '/subjects/英语' },
-          { text: '炼油化工设备', link: '/subjects/炼油化工设备' },
-        ],
-      },
-    ],
+    // 侧边栏:按路径分组(不再复制导航)
+    sidebar: {
+      '/subjects/': [
+        {
+          text: '📘 学科笔记',
+          items: [
+            { text: '高等数学', link: '/subjects/高等数学' },
+            { text: '机械原理', link: '/subjects/机械原理' },
+            { text: '英语', link: '/subjects/英语' },
+            { text: '炼油化工设备', link: '/subjects/炼油化工设备' },
+          ],
+        },
+      ],
+      '/': [
+        {
+          text: '🎯 每日行动',
+          items: [
+            { text: '首页', link: '/' },
+            { text: '每日学习', link: '/daily' },
+            { text: '在线小测', link: '/quiz' },
+            { text: '错题本', link: '/mistakes' },
+          ],
+        },
+        {
+          text: '📊 学习回顾',
+          items: [
+            { text: '学习进度', link: '/progress' },
+            { text: '学习计划', link: '/plan' },
+            { text: '每周周报', link: '/reports/' },
+          ],
+        },
+        {
+          text: '📘 学科笔记',
+          items: [
+            { text: '高等数学', link: '/subjects/高等数学' },
+            { text: '机械原理', link: '/subjects/机械原理' },
+            { text: '英语', link: '/subjects/英语' },
+            { text: '炼油化工设备', link: '/subjects/炼油化工设备' },
+          ],
+        },
+      ],
+    },
 
     footer: {
       message: '考研备考 · 每日更新 · MIT License',

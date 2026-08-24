@@ -1,18 +1,27 @@
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { fetchWithTimeout } from './fetchUtil.js'
+import { API_BASE, QUIZ_TOKEN } from './apiConfig.js'
 
-const API_BASE = 'https://hermes.4587693.xyz/quiz'
-const _t = ['31','b7','a7','46','3f','d9','db','60','c4','ff','30','bd','b9','4e','a1','fa','fd','f4','d3','97','bf','81','ab','7c'].join('')
 
 const state = ref('loading')  // loading | ready | error
 const items = ref([])         // 未解决错题
-const index = ref(0)
-const showAnswer = ref(false)  // 是否展开回忆(错题只有题干,回忆自己对错题的解法要点)
+const expanded = ref({})      // point -> bool
 const msg = ref('')
 const errorMsg = ref('')
 
+const SUBJECTS = ['高等数学', '机械原理', '英语', '炼油化工设备']
 const SUBJ_ICONS = { '高等数学': '📘', '机械原理': '⚙️', '英语': '🇬🇧', '炼油化工设备': '🏭' }
+
+// 按科目分组(每科内按日期倒序)
+const grouped = computed(() => {
+  return SUBJECTS.map(subj => {
+    const list = items.value
+      .filter(i => i.subject === subj)
+      .sort((a, b) => (b.date || '').localeCompare(a.date || ''))
+    return { subject: subj, icon: SUBJ_ICONS[subj] || '📘', count: list.length, list }
+  }).filter(g => g.count > 0)
+})
 
 async function fetchMistakes() {
   state.value = 'loading'
@@ -22,8 +31,6 @@ async function fetchMistakes() {
     if (!r.ok) throw new Error('HTTP ' + r.status)
     const d = await r.json()
     items.value = (d.items || []).filter(x => !x.resolved)
-    index.value = 0
-    showAnswer.value = false
     msg.value = ''
     state.value = 'ready'
   } catch (e) {
@@ -32,13 +39,15 @@ async function fetchMistakes() {
   }
 }
 
-async function resolveIt(resolved) {
-  const it = items.value[index.value]
-  if (!it) return
+function toggleExpand(it) {
+  expanded.value[it.point] = !expanded.value[it.point]
+}
+
+async function resolveIt(it, resolved) {
   try {
     const r = await fetchWithTimeout(`${API_BASE}/mistakes/resolve`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'X-Quiz-Token': _t },
+      headers: { 'Content-Type': 'application/json', 'X-Quiz-Token': QUIZ_TOKEN },
       body: JSON.stringify({ subject: it.subject, point: it.point, resolved }),
     })
     const d = await r.json()
@@ -46,21 +55,12 @@ async function resolveIt(resolved) {
       msg.value = '⚠️ ' + (d.result || '操作失败')
       return
     }
-    // 移出列表,前进
-    items.value.splice(index.value, 1)
-    if (index.value >= items.value.length) index.value = 0
-    showAnswer.value = false
+    items.value = items.value.filter(x => !(x.subject === it.subject && x.point === it.point))
+    delete expanded.value[it.point]
     msg.value = resolved ? '🎉 已标记解决,从错题本移除' : '🔁 已标记"还不会",继续保持复习'
   } catch (e) {
     msg.value = '❌ 操作失败: ' + e.message
   }
-}
-
-function prev() {
-  if (index.value > 0) { index.value--; showAnswer.value = false; msg.value = '' }
-}
-function next() {
-  if (index.value < items.value.length - 1) { index.value++; showAnswer.value = false; msg.value = '' }
 }
 
 onMounted(fetchMistakes)
@@ -68,8 +68,8 @@ onMounted(fetchMistakes)
 
 <template>
   <div class="mistakes-wrapper">
-    <h2>❌ 错题重练</h2>
-    <p class="sub">先回忆解法 → 展开核对 → 自评"记住了/还不会"。标记解决后移出错题本。</p>
+    <h2>❌ 错题本</h2>
+    <p class="sub">按科目浏览 · 点击错题前的日期,展开该题的解析。</p>
 
     <div v-if="state === 'loading'" class="status">⏳ 加载错题...</div>
     <div v-else-if="state === 'error'" class="status error">
@@ -77,39 +77,56 @@ onMounted(fetchMistakes)
       <button @click="fetchMistakes">重试</button>
     </div>
 
-    <div v-else-if="items.length === 0" class="status">
-      <p>🎉 太棒了,错题本已清零!</p>
-      <p class="hint">没有未解决的错题,继续保持。</p>
-    </div>
-
-    <div v-else class="card">
-      <div class="counter">{{ index + 1 }} / {{ items.length }}</div>
-      <div class="qhead">
-        <span class="badge">{{ SUBJ_ICONS[items[index].subject] || '' }} {{ items[index].subject }}</span>
-        <span class="date">错于 {{ items[index].date }}</span>
-      </div>
-      <p class="point"><b>知识点:</b> {{ items[index].point }}</p>
-
-      <!-- 回忆步骤:先隐藏,点按钮展开(模拟"先回忆再核对") -->
-      <button v-if="!showAnswer" class="recall-btn" @click="showAnswer = true">
-        💭 我已经回忆完毕,展开核对
-      </button>
-      <div v-else class="answer-box">
-        <p>✅ 已展开。回想你的解法要点:是公式记错?条件漏判?还是思路断了?</p>
-        <p class="hint">若完全想不起来,建议回对应科目笔记页复习后再来标记。</p>
+    <template v-else>
+      <div v-if="items.length === 0" class="status">
+        <p>🎉 太棒了,错题本已清零!</p>
+        <p class="hint">没有未解决的错题,继续保持。</p>
       </div>
 
-      <div class="actions">
-        <button class="btn-no" @click="resolveIt(false)" :disabled="!showAnswer">🔁 还不会</button>
-        <button class="btn-yes" @click="resolveIt(true)" :disabled="!showAnswer">✅ 记住了</button>
-      </div>
-      <p v-if="msg" class="msg">{{ msg }}</p>
+      <template v-else>
+        <p v-if="msg" class="msg">{{ msg }}</p>
 
-      <div class="nav">
-        <button class="nav-btn" @click="prev" :disabled="index === 0">← 上一题</button>
-        <button class="nav-btn" @click="next" :disabled="index >= items.length - 1">下一题 →</button>
-      </div>
-    </div>
+        <!-- 按科目分组 -->
+        <div v-for="g in grouped" :key="g.subject" class="subject-group">
+          <h3 class="subject-title">{{ g.icon }} {{ g.subject }}
+            <span class="subject-count">{{ g.count }} 题待复习</span>
+          </h3>
+
+          <!-- 该科目的错题列表 -->
+          <div v-for="it in g.list" :key="it.point" class="card">
+            <div class="card-head">
+              <!-- 点击日期 → 展开该题及解析 -->
+              <button class="date-link" :class="{ open: expanded[it.point] }"
+                      @click="toggleExpand(it)">
+                📅 {{ it.date }} {{ expanded[it.point] ? '▲' : '▼' }}
+              </button>
+              <span class="point">{{ it.point }}</span>
+            </div>
+
+            <!-- 展开:完整错题 + 解析 -->
+            <div v-if="expanded[it.point]" class="detail">
+              <!-- 题目:优先错题原文,老错题用知识库例题兜底 -->
+              <p v-if="it.q" class="qtext"><b>📋 题目:</b> {{ it.q }}</p>
+              <p v-else-if="it.knowledge && it.knowledge.example" class="qtext"><b>📋 题目(知识库例题):</b> {{ it.knowledge.example }}</p>
+              <p v-if="it.answer" class="answer-text"><b>✅ 正确答案:</b> {{ it.answer }}</p>
+              <p v-if="it.solution" class="solution-text"><b>📝 解析:</b><br>{{ it.solution }}</p>
+              <div v-if="it.knowledge && it.knowledge.content" class="knowledge-box">
+                <p class="knowledge-title"><b>📚 知识点回顾:</b></p>
+                <p class="knowledge-content">{{ it.knowledge.content }}</p>
+                <p v-if="it.knowledge.example" class="knowledge-example"><b>例题:</b> {{ it.knowledge.example }}</p>
+              </div>
+              <p v-if="!it.answer && !it.solution && !(it.knowledge && it.knowledge.content)" class="hint">
+                ⚠️ 暂无答案与解析,建议回对应科目笔记页复习该知识点后再标记。
+              </p>
+              <div class="actions">
+                <button class="btn-no" @click="resolveIt(it, false)">🔁 还不会</button>
+                <button class="btn-yes" @click="resolveIt(it, true)">✅ 记住了</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </template>
+    </template>
   </div>
 </template>
 
@@ -119,21 +136,25 @@ onMounted(fetchMistakes)
 .status { padding: 20px; text-align: center; color: #666; }
 .status.error { color: #d93025; }
 .hint { font-size: 13px; color: #999; }
-.card { border: 1px solid #e0e0e0; border-radius: 12px; padding: 18px; margin: 14px 0; background: #fff; }
-.counter { font-size: 12px; color: #999; text-align: right; }
-.qhead { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
-.badge { background: #f56c6c; color: #fff; padding: 3px 12px; border-radius: 12px; font-size: 13px; }
-.date { font-size: 12px; color: #999; }
-.point { font-size: 16px; font-weight: 600; margin: 10px 0; line-height: 1.5; }
-.recall-btn { width: 100%; background: #f0f0f0; color: #444; border: 1px dashed #bbb; border-radius: 10px; padding: 14px; font-size: 14px; cursor: pointer; }
-.answer-box { background: #f9f9f9; border: 1px solid #eee; border-radius: 10px; padding: 14px; font-size: 14px; color: #555; }
-.actions { display: flex; gap: 12px; margin-top: 14px; }
-.actions button { flex: 1; padding: 14px; border: none; border-radius: 10px; font-size: 15px; cursor: pointer; }
+.msg { font-size: 13px; color: #3eaf7c; margin: 8px 0; }
+.subject-group { margin: 18px 0; }
+.subject-title { font-size: 18px; font-weight: 700; border-bottom: 2px solid #eee; padding-bottom: 6px; margin-bottom: 8px; }
+.subject-count { font-size: 12px; color: #f56c6c; font-weight: 400; margin-left: 8px; }
+.card { border: 1px solid #e0e0e0; border-radius: 10px; padding: 10px 12px; margin: 8px 0; background: #fff; }
+.card-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.date-link { background: #fff3e0; border: 1px solid #ffb74d; color: #b26a00; border-radius: 14px; padding: 3px 10px; font-size: 12px; cursor: pointer; white-space: nowrap; }
+.date-link.open { background: #ffb74d; color: #fff; }
+.point { font-size: 14px; font-weight: 600; color: #333; }
+.detail { margin-top: 8px; padding-top: 8px; border-top: 1px dashed #e0e0e0; }
+.qtext { font-size: 14px; color: #333; margin: 6px 0; line-height: 1.5; }
+.answer-text { font-size: 14px; color: #2e7d32; background: #e8f5e9; border-radius: 6px; padding: 6px 10px; margin: 6px 0; }
+.solution-text { font-size: 14px; color: #333; line-height: 1.6; white-space: pre-wrap; }
+.knowledge-box { background: #f0f7ff; border: 1px solid #b3d4fc; border-radius: 8px; padding: 10px; margin: 8px 0; }
+.knowledge-title { font-size: 14px; color: #1a56db; margin-bottom: 4px; }
+.knowledge-content { font-size: 14px; color: #333; line-height: 1.6; }
+.knowledge-example { font-size: 13px; color: #555; margin-top: 6px; }
+.actions { display: flex; gap: 10px; margin-top: 10px; }
+.actions button { flex: 1; padding: 12px; border: none; border-radius: 10px; font-size: 14px; cursor: pointer; }
 .btn-no { background: #fff; color: #e6a23c; border: 2px solid #e6a23c !important; }
 .btn-yes { background: #3eaf7c; color: #fff; }
-.actions button:disabled { opacity: .4; cursor: not-allowed; }
-.msg { font-size: 13px; color: #3eaf7c; margin-top: 10px; text-align: center; }
-.nav { display: flex; justify-content: space-between; margin-top: 14px; }
-.nav-btn { background: #fff; color: #666; border: 1px solid #ddd; border-radius: 8px; padding: 8px 16px; font-size: 13px; cursor: pointer; }
-.nav-btn:disabled { opacity: .4; cursor: not-allowed; }
 </style>

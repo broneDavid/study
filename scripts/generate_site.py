@@ -168,18 +168,15 @@ def mistakes_to_markdown():
         if not items:
             continue
         icon = SUBJECT_ICONS.get(subj, "📘")
-        lines.append(f"## {icon} {subj}")
+        lines.append(f"## {icon} {subj} 已解决(历史)")
         lines.append("")
-        open_items = [i for i in items if not i.get("resolved")]
         closed = [i for i in items if i.get("resolved")]
-        for i in open_items:
-            d = i.get("date", "")
-            pt = i.get("point", "")
-            lines.append(f"- 🔴 `{d}` {pt} (未解决)")
         for i in closed:
             d = i.get("date", "")
             pt = i.get("point", "")
             lines.append(f"- ✅ `{d}` {pt}")
+        if not closed:
+            lines.append("_暂无已解决错题_")
         lines.append("")
 
     # 顶部摘要(定位在标题后)
@@ -643,28 +640,17 @@ def daily_to_markdown():
     lines.append(_milestones())
     lines.append("")
 
-    # 在线小测
+    # 在线小测(独立页,不再内嵌组件)
     lines.append("## 📝 在线小测")
     lines.append("")
-    lines.append("直接答题,提交后 AI 自动批改,成绩写回学习进度。")
-    lines.append("")
-    lines.append("<QuizComponent />")
+    lines.append("今日题目已生成,去 [在线小测](/quiz) 答题(提交后 AI 自动批改 + 解题步骤,成绩写回学习进度)。")
     lines.append("")
 
-    lines.append("## 🚀 快捷入口")
-    lines.append("")
-    lines.append("| 页面 | 说明 |")
-    lines.append("|------|------|")
-    lines.append("| [📝 在线小测](/quiz) | 网页答题,AI 自动批改 |")
-    lines.append("| [📈 学习进度](/progress) | 各科掌握度曲线 |")
-    lines.append("| [❌ 错题本](/mistakes) | 未解决错题 |")
-    lines.append("| [🎯 学习计划](/plan) | 考研三阶段备考计划 |")
-    lines.append("| [📅 每周周报](/reports/) | 每周备考周报 |")
-    lines.append("")
     return lines
 
 # ---------- 首页仪表盘 ----------
 def home_to_markdown():
+    """门户页:hero + 学科入口 + 快捷入口(掌握度/日历/里程碑/知识点全部移入 daily/progress)。"""
     lines = []
     lines.append("---")
     lines.append("layout: home")
@@ -675,89 +661,34 @@ def home_to_markdown():
     days, stage = _exam_countdown()
     lines.append("> **考研备考:** 数学一 · 机械原理 · 英语一 · 炼油化工设备\\n> **考研倒计时: {} 天 · {}阶段**\\n📌 本网站由学习系统自动生成, 每日更新。".format(days, stage))
     lines.append("")
-
-    # 今日行动条(实时状态组件)
-    lines.append("## ✅ 今日行动")
+    lines.append("**👉 今天学什么? 去 [每日学习](/daily) 看今日任务与知识点。**")
     lines.append("")
-    lines.append("<DailyTasksComponent />")
+    lines.append("## 📘 学科笔记")
     lines.append("")
-
-    # 掌握度速览卡(HTML)
-    lines.append("## 📊 掌握度速览")
-    lines.append("")
-    data = load_json(os.path.join(STUDY_DIR, "progress", "progress.json"), {"subjects": {}})
-    subs = data.get("subjects", {})
-    lines.append('<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;">')
+    lines.append('<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;">')
     for subj in SUBJECTS:
-        m = subs.get(subj, {}).get("mastery", 0)
         icon = SUBJECT_ICONS.get(subj, "📘")
-        color = "#3eaf7c" if m >= 50 else ("#e6a23c" if m >= 30 else "#f56c6c")
-        lines.append(f'<div style="background:#fff;border:1px solid #e0e0e0;border-radius:10px;padding:12px;box-shadow:0 1px 3px rgba(0,0,0,.06);">'
-                     f'<div style="font-size:14px;color:#666;">{icon} {subj}</div>'
-                     f'<div style="font-size:26px;font-weight:700;color:{color};">{m}%</div>'
-                     f'<div style="height:6px;background:#eee;border-radius:3px;margin-top:6px;">'
-                     f'<div style="height:100%;width:{m}%;background:{color};border-radius:3px;"></div></div></div>')
+        data2 = load_json(os.path.join(STUDY_DIR, "knowledge", f"{subj}.json"), {"items": []})
+        cnt = len(data2.get("items", []))
+        lines.append(f'<a href="/study/subjects/{subj}" style="display:block;background:#fff;border:1px solid #e0e0e0;border-radius:10px;padding:14px;text-decoration:none;color:#333;box-shadow:0 1px 3px rgba(0,0,0,.06);">'
+                     f'<div style="font-size:16px;font-weight:600;">{icon} {subj}</div>'
+                     f'<div style="font-size:13px;color:#888;margin-top:4px;">{cnt} 个知识点</div></a>')
     lines.append('</div>')
     lines.append("")
-
-    # 打卡日历 + 里程碑
-    cal_html, streak, cal_total = _calendar_heatmap()
-    lines.append("## 📅 打卡日历(近 90 天)")
-    lines.append("")
-    lines.append("> 🔥 **连续学习 {} 天** · 近 90 天打卡 {} 天 · 绿=已打卡 橙框=今天".format(streak, cal_total))
-    lines.append("")
-    lines.append(cal_html)
-    lines.append("")
-    lines.append("## 🏅 里程碑")
-    lines.append("")
-    lines.append(_milestones())
-    lines.append("")
-
-    # 今日知识点练习
-    lines.append("## 📚 最近的知识点")
-    lines.append("")
-    # 从四科里取最近创建的几个作为"今日"
-    latest = []
-    for subj in SUBJECTS:
-        data2 = load_json(os.path.join(STUDY_DIR, "knowledge", f"{subj}.json"), {"items": []})
-        for it in data2.get("items", []):
-            latest.append((subj, it))
-    latest.sort(key=lambda x: x[1].get("created", ""), reverse=True)
-    lines.append('**本网站以四科笔记库为主: 点击左侧"学科笔记"深入浏览。**')
-    lines.append("")
-    for subj, it in latest[:5]:
-        icon = SUBJECT_ICONS.get(subj, "📘")
-        title = it.get("title", "")
-        m = it.get("mastery", 0)
-        lines.append(f"### {icon} {subj} · {title}")
-        lines.append(f"> 掌握 {m}% · 创建 {it.get('created','')}")
-        content = (it.get("content", "") or "")[:200]
-        example = it.get("example", "")
-        if content:
-            lines.append("")
-            lines.append(content)
-        if example:
-            lines.append("")
-            lines.append(f"> **例题:** {example}")
-        lines.append("")
-
-    # 快捷入口(含链接要用相对路径)
-    lines.append("## 🚀 快捷入口")
+    lines.append("## 🧭 快捷入口")
     lines.append("")
     lines.append("| 页面 | 说明 |")
     lines.append("|------|------|")
-    lines.append("| [📅 每日学习](/daily) | 今日任务清单+科目+小测,一页完成 |")
-    lines.append("| [📝 在线小测](/quiz) | 网页答题,AI 自动批改,成绩写回进度 |")
-    lines.append("| [📈 学习进度](/progress) | 各科掌握度曲线 & 最近学习要点 |")
-    lines.append("| [❌ 错题本](/mistakes) | 未解决错题 & 复习记录 |")
-    lines.append("| [🎯 学习计划](/plan) | 考研三阶段备考计划 |")
-    lines.append("| [📅 每周周报](/reports/) | 每周备考周报 |")
-    lines.append("| [📘 高等数学笔记](/subjects/高等数学) | 极限/导数/积分知识库 |")
-    lines.append("| [⚙️ 机械原理笔记](/subjects/机械原理) | 机构/运动学/齿轮知识库 |")
+    lines.append("| [📅 每日学习](/daily) | 今日任务 · 知识点 · 到期复习 |")
+    lines.append("| [✏️ 在线小测](/quiz) | 每日 6 题 · 即时批改 · 解题步骤 |")
+    lines.append("| [❌ 错题本](/mistakes) | 按科目分组 · 点日期看解析 |")
+    lines.append("| [📈 学习进度](/progress) | 掌握度 · 打卡日历 · 里程碑 |")
+    lines.append("| [🗓️ 学习计划](/plan) | 考研三阶段计划 · 科目轮换 |")
+    lines.append("| [📊 每周周报](/reports/) | 周报归档 PDF |")
     lines.append("")
     return lines
 
-# ---------- 主流程 ----------
+
 def main():
     global STUDY_DIR, OUT_DIR, WEEKLY_DIR
     ap = argparse.ArgumentParser()
