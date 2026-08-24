@@ -103,24 +103,27 @@ onMounted(fetchMistakes)
               <span class="point">{{ it.point }}</span>
             </div>
 
-            <!-- 展开:完整错题 + 解析 -->
-            <div v-if="expanded[it.point]" class="detail">
-              <!-- 题目:优先错题原文,老错题用知识库例题兜底 -->
-              <p v-if="it.q" class="qtext"><b>📋 题目:</b> {{ it.q }}</p>
-              <p v-else-if="it.knowledge && it.knowledge.example" class="qtext"><b>📋 题目(知识库例题):</b> {{ it.knowledge.example }}</p>
-              <p v-if="it.answer" class="answer-text"><b>✅ 正确答案:</b> {{ it.answer }}</p>
-              <p v-if="it.solution" class="solution-text"><b>📝 解析:</b><br>{{ it.solution }}</p>
-              <div v-if="it.knowledge && it.knowledge.content" class="knowledge-box">
-                <p class="knowledge-title"><b>📚 知识点回顾:</b></p>
-                <p class="knowledge-content">{{ it.knowledge.content }}</p>
-                <p v-if="it.knowledge.example" class="knowledge-example"><b>例题:</b> {{ it.knowledge.example }}</p>
-              </div>
-              <p v-if="!it.answer && !it.solution && !(it.knowledge && it.knowledge.content)" class="hint">
-                ⚠️ 暂无答案与解析,建议回对应科目笔记页复习该知识点后再标记。
-              </p>
-              <div class="actions">
-                <button class="btn-no" @click="resolveIt(it, false)">🔁 还不会</button>
-                <button class="btn-yes" @click="resolveIt(it, true)">✅ 记住了</button>
+            <!-- 展开:grid-rows 平滑过渡(修 height 抖动) -->
+            <div class="app-expand" :class="{ open: expanded[it.point] }">
+              <div>
+                <div class="detail">
+                  <p v-if="it.q" class="qtext"><b>📋 题目:</b> {{ it.q }}</p>
+                  <p v-else-if="it.knowledge && it.knowledge.example" class="qtext"><b>📋 题目(知识库例题):</b> {{ it.knowledge.example }}</p>
+                  <p v-if="it.answer" class="answer-text"><b>✅ 正确答案:</b> {{ it.answer }}</p>
+                  <p v-if="it.solution" class="solution-text"><b>📝 解析:</b><br>{{ it.solution }}</p>
+                  <div v-if="it.knowledge && it.knowledge.content" class="knowledge-box">
+                    <p class="knowledge-title"><b>📚 知识点回顾:</b></p>
+                    <p class="knowledge-content">{{ it.knowledge.content }}</p>
+                    <p v-if="it.knowledge.example" class="knowledge-example"><b>例题:</b> {{ it.knowledge.example }}</p>
+                  </div>
+                  <p v-if="!it.answer && !it.solution && !(it.knowledge && it.knowledge.content)" class="hint">
+                    ⚠️ 暂无答案与解析,建议回对应科目笔记页复习该知识点后再标记。
+                  </p>
+                  <div class="actions">
+                    <button class="btn-no" @click="resolveIt(it, false)">🔁 还不会</button>
+                    <button class="btn-yes" @click="resolveIt(it, true)">✅ 记住了</button>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
@@ -136,14 +139,16 @@ onMounted(fetchMistakes)
 .status { padding: 20px; text-align: center; color: #666; }
 .status.error { color: #d93025; }
 .hint { font-size: 13px; color: #999; }
-.msg { font-size: 13px; color: #3eaf7c; margin: 8px 0; }
+.msg { font-size: 13px; color: #0071e3; margin: 8px 0; }
 .subject-group { margin: 18px 0; }
 .subject-title { font-size: 18px; font-weight: 700; border-bottom: 2px solid #eee; padding-bottom: 6px; margin-bottom: 8px; }
 .subject-count { font-size: 12px; color: #f56c6c; font-weight: 400; margin-left: 8px; }
-.card { border: 1px solid #e0e0e0; border-radius: 10px; padding: 10px 12px; margin: 8px 0; background: #fff; }
+.card { border: 1px solid rgba(255,255,255,.6); border-radius: 16px; padding: 12px 14px; margin: 10px 0; background: rgba(255,255,255,.72); box-shadow: 0 2px 16px rgba(0,0,0,.06);
+  -webkit-backdrop-filter: saturate(180%) blur(20px); backdrop-filter: saturate(180%) blur(20px); }
+@media (prefers-color-scheme: dark) { .card { background: rgba(28,28,32,.72); border-color: rgba(255,255,255,.1); } }
 .card-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-.date-link { background: #fff3e0; border: 1px solid #ffb74d; color: #b26a00; border-radius: 14px; padding: 3px 10px; font-size: 12px; cursor: pointer; white-space: nowrap; }
-.date-link.open { background: #ffb74d; color: #fff; }
+.date-link { background: rgba(255,149,0,.12); border: 1px solid #ff9500; color: #ff9500; border-radius: 14px; padding: 3px 10px; font-size: 12px; cursor: pointer; white-space: nowrap; }
+.date-link.open { background: #ff9500; color: #fff; }
 .point { font-size: 14px; font-weight: 600; color: #333; }
 .detail { margin-top: 8px; padding-top: 8px; border-top: 1px dashed #e0e0e0; }
 .qtext { font-size: 14px; color: #333; margin: 6px 0; line-height: 1.5; }
@@ -155,6 +160,6 @@ onMounted(fetchMistakes)
 .knowledge-example { font-size: 13px; color: #555; margin-top: 6px; }
 .actions { display: flex; gap: 10px; margin-top: 10px; }
 .actions button { flex: 1; padding: 12px; border: none; border-radius: 10px; font-size: 14px; cursor: pointer; }
-.btn-no { background: #fff; color: #e6a23c; border: 2px solid #e6a23c !important; }
-.btn-yes { background: #3eaf7c; color: #fff; }
+.btn-no { background: transparent; color: #ff9500; border: 2px solid #ff9500 !important; }
+.btn-yes { background: linear-gradient(180deg,#0077ed,#0071e3); color: #fff; box-shadow: inset 0 1px 0 rgba(255,255,255,.25); }
 </style>

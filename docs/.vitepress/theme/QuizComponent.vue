@@ -150,13 +150,15 @@ onMounted(fetchToday)
 
         <!-- 选择题 -->
         <div v-if="q.type === 'choice'" class="options">
-          <label v-for="(opt, key) in q.options" :key="key" class="opt">
+          <label v-for="(opt, key) in q.options" :key="key"
+                 class="opt" :class="{ selected: answers[qi] === key }">
             <!-- name 用索引 qi 保证唯一(seq 重复时同名 radio 会互斥丢勾选) -->
             <input type="radio" :name="'q' + qi" :value="key"
                    :checked="answers[qi] === key"
                    :disabled="state === 'submitting'"
                    @change="answers[qi] = key" />
-            <span><b>{{ key }}.</b> {{ opt }}</span>
+            <span class="opt-key">{{ key }}</span>
+            <span class="opt-text">{{ opt }}</span>
           </label>
         </div>
         <!-- 问答题 -->
@@ -210,13 +212,23 @@ onMounted(fetchToday)
 .status.error { color: #d93025; }
 .hint { font-size: 13px; color: #999; }
 .draft-notice { background: #fff8e1; border: 1px solid #e6a23c; color: #b26a00; padding: 8px 12px; border-radius: 8px; font-size: 13px; margin: 8px 0; }
-.question { border: 1px solid #e0e0e0; border-radius: 10px; padding: 16px; margin: 14px 0; background: #fff; }
+.question { border: 1px solid rgba(255,255,255,.6); border-radius: 16px; padding: 16px; margin: 12px 0; background: rgba(255,255,255,.72); box-shadow: 0 2px 16px rgba(0,0,0,.06); -webkit-backdrop-filter: saturate(180%) blur(20px); backdrop-filter: saturate(180%) blur(20px); }
 .qhead { display: flex; gap: 8px; margin-bottom: 6px; }
-.badge { background: #3eaf7c; color: #fff; padding: 2px 10px; border-radius: 12px; font-size: 12px; }
+.badge { background: rgba(0,113,227,.12); color: #0071e3; color: #fff; padding: 2px 10px; border-radius: 12px; font-size: 12px; }
 .qtype { background: #f0f0f0; padding: 2px 10px; border-radius: 12px; font-size: 12px; color: #555; }
 .qtext { font-size: 15px; margin: 8px 0; }
 .options { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; }
-.opt { display: flex; gap: 8px; align-items: center; border: 1px solid #eee; padding: 8px 12px; border-radius: 8px; cursor: pointer; }
+.opt { display: flex; gap: 10px; align-items: center; border: 1px solid rgba(128,128,128,.2); padding: 10px 14px; border-radius: 12px; cursor: pointer; background: rgba(255,255,255,.6); transition: transform .15s ease, border-color .2s ease, background-color .2s ease, box-shadow .2s ease; }
+.opt:active { transform: scale(.99); }
+.opt.selected { border-color: #0071e3; background: rgba(0,113,227,.08); box-shadow: 0 0 0 1px rgba(0,113,227,.3); }
+.opt-key { width: 24px; height: 24px; border-radius: 50%; border: 1.5px solid rgba(128,128,128,.35); display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 600; color: #6e6e73; flex-shrink: 0; transition: all .2s ease; }
+.opt.selected .opt-key { background: #0071e3; border-color: #0071e3; color: #fff; transform: scale(1.05); }
+.opt-text { font-size: 15px; color: #1d1d1f; line-height: 1.5; }
+@media (prefers-color-scheme: dark) {
+  .opt { background: rgba(28,28,32,.6); border-color: rgba(255,255,255,.12); }
+  .opt.selected { border-color: #0a84ff; background: rgba(10,132,255,.12); }
+  .opt-text { color: #f5f5f7; }
+}
 .opt:hover { background: #f6f6f6; }
 textarea { width: 100%; border: 1px solid #ddd; border-radius: 8px; padding: 8px; font-size: 14px; font-family: inherit; }
 .qa-area { display: flex; flex-direction: column; gap: 6px; }
@@ -226,15 +238,16 @@ textarea { width: 100%; border: 1px solid #ddd; border-radius: 8px; padding: 8px
 .sym-panel { display: flex; flex-wrap: wrap; gap: 4px; padding: 6px; background: #fafafa; border: 1px solid #eee; border-radius: 8px; height: 0; margin: 0; overflow: hidden; visibility: hidden; }
 .sym-panel.open { height: auto; margin: 0 0 8px; visibility: visible; }
 .sym-btn { background: #fff; border: 1px solid #ddd; border-radius: 5px; padding: 4px 8px; font-size: 15px; cursor: pointer; min-width: 36px; font-family: "SF Pro Text", -apple-system, "PingFang SC", "Segoe UI Symbol", "Apple Symbols", sans-serif; }
-.sym-btn:hover { background: #3eaf7c; color: #fff; border-color: #3eaf7c; }
+.sym-btn:hover { background: #0071e3; color: #fff; border-color: #0071e3; }
 .actions { text-align: center; margin-top: 16px; }
 .advance-area { text-align: center; margin-top: 10px; padding-top: 10px; border-top: 1px dashed #ddd; }
-.advance-btn { background: #fff; color: #3eaf7c; border: 1px solid #3eaf7c; padding: 8px 20px; border-radius: 8px; font-size: 14px; cursor: pointer; }
-.advance-btn:hover { background: #3eaf7c; color: #fff; }
-.advance-msg { color: #3eaf7c; font-size: 13px; margin-top: 6px; }
-button { background: #3eaf7c; color: #fff; border: none; padding: 10px 24px; border-radius: 8px; font-size: 15px; cursor: pointer; }
+.advance-btn { background: transparent; color: #0071e3; border: 1px solid #0071e3; padding: 8px 20px; border-radius: 8px; font-size: 14px; cursor: pointer; }
+.advance-btn:hover { background: #0071e3; color: #fff; }
+.advance-msg { color: #0071e3; font-size: 13px; margin-top: 6px; }
+button { background: linear-gradient(180deg,#0077ed,#0071e3); color: #fff; border: none; padding: 10px 24px; border-radius: 980px; box-shadow: inset 0 1px 0 rgba(255,255,255,.25), 0 2px 8px rgba(0,113,227,.3); font-size: 15px; cursor: pointer; }
 button:hover { opacity: .9; }
 button:disabled { opacity: .5; cursor: not-allowed; }
-.result { border: 1px solid #3eaf7c; border-radius: 10px; padding: 16px; }
+.result { border: 1px solid rgba(0,113,227,.3); border-radius: 14px; padding: 16px; background: rgba(0,113,227,.05); }
 .result pre { white-space: pre-wrap; background: #f6f6f6; padding: 12px; border-radius: 8px; }
+@media (prefers-color-scheme: dark) { .question { background: rgba(28,28,32,.72); border-color: rgba(255,255,255,.1); } }
 </style>

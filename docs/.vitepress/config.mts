@@ -13,7 +13,7 @@ export default defineConfig({
 
   head: [
     ['meta', { name: 'description', content: '记录学习积累内容 (考研: 数一·机械原理·英一·化工设备)' }],
-    ['meta', { name: 'theme-color', content: '#3eaf7c' }],
+    ['meta', { name: 'theme-color', content: '#0071e3' }],
   ],
 
   markdown: {

@@ -227,7 +227,7 @@ def progress_to_markdown():
   .mastery-row { display:flex; align-items:center; gap:12px; margin:8px 0; }
   .mastery-row .label { width:130px; font-weight:600; }
   .mastery-bar { flex:1; height:18px; background:#e9ecef; border-radius:9px; overflow:hidden; }
-  .mastery-fill { height:100%; background:linear-gradient(90deg,#3eaf7c,#67c23a); border-radius:9px; }
+  .mastery-fill { height:100%; background:linear-gradient(90deg,#0071e3,#0a84ff); border-radius:9px; }
   .mastery-val { width:50px; text-align:right; font-weight:600; }
 </style>
 """
@@ -365,18 +365,18 @@ def _due_items():
     return due
 
 def _mastery_cards():
-    """掌握度卡片 HTML(与首页一致)。"""
+    """掌握度卡片 HTML(苹果质感:圆角+毛玻璃+细腻阴影)。"""
     data = load_json(os.path.join(STUDY_DIR, "progress", "progress.json"), {"subjects": {}})
     subs = data.get("subjects", {})
-    out = ['<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;">']
+    out = ['<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;">']
     for subj in SUBJECTS:
         m = subs.get(subj, {}).get("mastery", 0)
         icon = SUBJECT_ICONS.get(subj, "📘")
-        color = "#3eaf7c" if m >= 50 else ("#e6a23c" if m >= 30 else "#f56c6c")
-        out.append(f'<div style="background:#fff;border:1px solid #e0e0e0;border-radius:10px;padding:10px;box-shadow:0 1px 3px rgba(0,0,0,.06);">'
-                   f'<div style="font-size:13px;color:#666;">{icon} {subj}</div>'
-                   f'<div style="font-size:22px;font-weight:700;color:{color};">{m}%</div>'
-                   f'<div style="height:5px;background:#eee;border-radius:3px;margin-top:4px;">'
+        color = "#34c759" if m >= 50 else ("#ff9500" if m >= 30 else "#ff3b30")
+        out.append(f'<div class="app-card" style="padding:14px;margin:2px;">'
+                   f'<div style="font-size:13px;color:#86868b;">{icon} {subj}</div>'
+                   f'<div style="font-size:26px;font-weight:700;color:{color};letter-spacing:-0.02em;margin-top:2px;">{m}%</div>'
+                   f'<div style="height:6px;background:rgba(128,128,128,.15);border-radius:3px;margin-top:8px;">'
                    f'<div style="height:100%;width:{m}%;background:{color};border-radius:3px;"></div></div></div>')
     out.append('</div>')
     return "\n".join(out)
@@ -418,12 +418,12 @@ def _calendar_heatmap(months_back=3):
         is_today = (key == today)
         if key in days:
             total += 1
-            bg = "#3eaf7c" if is_today else "#7ecba0"
-            cell_html.append(f'<div title="{key}" style="background:{bg};border-radius:4px;height:18px;min-width:10px;flex:1;"></div>')
+            bg = "#34c759" if is_today else "rgba(52,199,89,.55)"
+            cell_html.append(f'<div title="{key}" style="background:{bg};border-radius:5px;height:20px;min-width:11px;flex:1;"></div>')
         else:
-            bg = "#f0f0f0" if is_today else "#fafafa"
-            border = "2px solid #e6a23c" if is_today else "1px solid #eee"
-            cell_html.append(f'<div title="{key}" style="background:{bg};border:{border};border-radius:4px;height:18px;min-width:10px;flex:1;"></div>')
+            bg = "rgba(128,128,128,.12)" if is_today else "rgba(128,128,128,.05)"
+            border = "2px solid #0071e3" if is_today else "1px solid rgba(128,128,128,.1)"
+            cell_html.append(f'<div title="{key}" style="background:{bg};border:{border};border-radius:5px;height:20px;min-width:11px;flex:1;"></div>')
         cur += timedelta(days=1)
     html = ('<div style="display:flex;gap:3px;flex-wrap:nowrap;overflow-x:auto;padding:4px 0;">'
             + "".join(cell_html) + '</div>')
@@ -440,12 +440,12 @@ def _milestones():
 
     def badge(emoji, name, done, tip=""):
         if done:
-            return (f'<div style="background:#e8f5e9;border:1px solid #3eaf7c;border-radius:10px;padding:10px;text-align:center;">'
-                    f'<div style="font-size:22px;">{emoji}</div><div style="font-size:13px;font-weight:600;color:#2e7d32;">{name}</div>'
-                    f'<div style="font-size:11px;color:#888;">已达成</div></div>')
-        return (f'<div style="background:#fafafa;border:1px dashed #ddd;border-radius:10px;padding:10px;text-align:center;opacity:.7;">'
-                f'<div style="font-size:22px;">{emoji}</div><div style="font-size:13px;color:#888;">{name}</div>'
-                f'<div style="font-size:11px;color:#aaa;">{tip}</div></div>')
+            return (f'<div class="app-card" style="padding:12px;text-align:center;border:1px solid rgba(52,199,89,.3);">'
+                    f'<div style="font-size:24px;">{emoji}</div><div style="font-size:13px;font-weight:600;color:#34c759;">{name}</div>'
+                    f'<div style="font-size:11px;color:#86868b;">已达成</div></div>')
+        return (f'<div style="background:rgba(128,128,128,.04);border:1px dashed rgba(128,128,128,.25);border-radius:14px;padding:12px;text-align:center;opacity:.75;">'
+                f'<div style="font-size:24px;">{emoji}</div><div style="font-size:13px;color:#86868b;">{name}</div>'
+                f'<div style="font-size:11px;color:#aeaeb2;">{tip}</div></div>')
 
     out = ['<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;">']
     out.append(badge("🔥", "连续 7 天", streak >= 7, f"还差 {max(0,7-streak)} 天"))

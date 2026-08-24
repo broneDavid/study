@@ -10,11 +10,11 @@
 
 **已掌握要点:**
 
-- 链式法则:cos²(3x)求导错
-- 链式法则第3错:cos²(3x)符号
-- 复合函数求导(链式法则)
 - 第一类换元积分法(凑微分法)
 - 测试:复合函数求导
+- 复合函数求导(链式法则变体)
+- 定积分的换元积分法
+- 求极限(洛必达法则重难点)
 
 ### ⚙️ 机械原理 — 40%
 
@@ -40,24 +40,24 @@
 - distinguish between A and B 区分
 - attribute A to B 归因于
 
-### 🏭 炼油化工设备 — 100%
+### 🏭 炼油化工设备 — 80%
 
-> ██████████ · 连击 11 天
+> ████████░░ · 连击 11 天
 
 **已掌握要点:**
 
-- 三泵原理混淆(重复错误×2)
-- 泵启动准备:连续2次漏灌泵排气
-- 离心泵启动前灌泵与气缚现象
 - 离心泵的工作原理
 - 离心泵气蚀(汽蚀)现象
+- 离心泵启动故障判断(气缚变体)
+- 泵类型选型(三泵原理变体)
+- 气缚与气蚀的本质区别(变体)
 
 
 <style>
   .mastery-row { display:flex; align-items:center; gap:12px; margin:8px 0; }
   .mastery-row .label { width:130px; font-weight:600; }
   .mastery-bar { flex:1; height:18px; background:#e9ecef; border-radius:9px; overflow:hidden; }
-  .mastery-fill { height:100%; background:linear-gradient(90deg,#3eaf7c,#67c23a); border-radius:9px; }
+  .mastery-fill { height:100%; background:linear-gradient(90deg,#0071e3,#0a84ff); border-radius:9px; }
   .mastery-val { width:50px; text-align:right; font-weight:600; }
 </style>
 
@@ -66,13 +66,10 @@
 <div class="mastery-row"><span class="label">📘 高等数学</span><div class="mastery-bar"><div class="mastery-fill" style="width:40%"></div></div><span class="mastery-val">40%</span></div>
 <div class="mastery-row"><span class="label">⚙️ 机械原理</span><div class="mastery-bar"><div class="mastery-fill" style="width:40%"></div></div><span class="mastery-val">40%</span></div>
 <div class="mastery-row"><span class="label">🇬🇧 英语</span><div class="mastery-bar"><div class="mastery-fill" style="width:100%"></div></div><span class="mastery-val">100%</span></div>
-<div class="mastery-row"><span class="label">🏭 炼油化工设备</span><div class="mastery-bar"><div class="mastery-fill" style="width:100%"></div></div><span class="mastery-val">100%</span></div>
+<div class="mastery-row"><span class="label">🏭 炼油化工设备</span><div class="mastery-bar"><div class="mastery-fill" style="width:80%"></div></div><span class="mastery-val">80%</span></div>
 
 ## 最近学习要点
 
-- 🇬🇧 **英语** — distinguish between A and B(搭配×2)
-- 🇬🇧 **英语** — 长难句翻译:by which 定语从句
-- 🇬🇧 **英语** — distinguish between A and B 区分
 - 🇬🇧 **英语** — attribute A to B 归因于
 - 🏭 **炼油化工设备** — 离心泵vs齿轮泵vs往复泵原理
 - 🏭 **炼油化工设备** — 三泵原理混淆(重复错误×2)
@@ -80,3 +77,6 @@
 - 🏭 **炼油化工设备** — 离心泵启动前灌泵与气缚现象
 - 🏭 **炼油化工设备** — 离心泵的工作原理
 - 🏭 **炼油化工设备** — 离心泵气蚀(汽蚀)现象
+- 🏭 **炼油化工设备** — 离心泵启动故障判断(气缚变体)
+- 🏭 **炼油化工设备** — 泵类型选型(三泵原理变体)
+- 🏭 **炼油化工设备** — 气缚与气蚀的本质区别(变体)

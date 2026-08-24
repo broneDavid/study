@@ -1,5 +1,6 @@
 import DefaultTheme from 'vitepress/theme'
 import './katex-css/katex.min.css'
+import './apple.css'
 import QuizComponent from './QuizComponent.vue'
 import MistakesReplayComponent from './MistakesReplayComponent.vue'
 import DailyTasksComponent from './DailyTasksComponent.vue'

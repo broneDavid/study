@@ -1,0 +1,201 @@
+/* ========== Apple 质感设计系统 v2(精修版) ==========
+   视觉设计师:配色收敛/阴影分层/按钮体系/排版 token
+   动效交互师:按压反馈/状态弹入
+   批判审查者:深色双轨修复/毛玻璃降级/性能限量 */
+
+:root {
+  /* 配色 token(苹果语义色) */
+  --app-bg: #f5f5f7;
+  --app-grad-1: #e8edf5;
+  --app-grad-2: #f5f5f7;
+  --app-card: rgba(255, 255, 255, 0.72);
+  --app-card-solid: #ffffff;
+  --app-border: rgba(255, 255, 255, 0.6);
+  --app-text: #1d1d1f;
+  --app-text-2: #6e6e73;
+  --app-text-3: #aeaeb2;
+  --app-blue: #0071e3;
+  --app-blue-hover: #0077ed;
+  --app-blue-pressed: #006edb;
+  --app-blue-soft: rgba(0, 113, 227, 0.1);
+  --app-green: #34c759;
+  --app-orange: #ff9500;
+  --app-red: #ff3b30;
+  --app-gray: #8e8e93;
+  --app-font: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Helvetica Neue", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+
+  /* 阴影分层:内高光 + 近影 + 远影 */
+  --app-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.65), 0 2px 4px rgba(0, 0, 0, 0.04), 0 8px 24px rgba(0, 0, 0, 0.07);
+  --app-shadow-sm: inset 0 1px 0 rgba(255, 255, 255, 0.5), 0 1px 6px rgba(0, 0, 0, 0.05);
+  --app-radius: 18px;
+  --app-radius-sm: 12px;
+  --app-blur: 16px;
+
+  /* 排版 token */
+  --fs-display: clamp(32px, 6vw, 42px);
+  --fs-h1: clamp(26px, 5vw, 32px);
+  --fs-h2: 22px;
+  --fs-h3: 17px;
+  --fs-body: 16px;
+  --fs-caption: 13px;
+  --fs-tiny: 12px;
+
+  /* VitePress 品牌色统一为苹果蓝 */
+  --vp-c-brand-1: #0071e3;
+  --vp-c-brand-2: #0077ed;
+  --vp-c-brand-3: #0a84ff;
+  --vp-c-brand-soft: rgba(0, 113, 227, 0.14);
+}
+
+/* 深色模式:同时响应系统偏好 + VitePress html.dark(修复双轨制) */
+@media (prefers-color-scheme: dark) {
+  :root:not(.light) {
+    --app-bg: #000;
+    --app-grad-1: #0a0a0f;
+    --app-grad-2: #1a1a22;
+    --app-card: rgba(28, 28, 30, 0.72);
+    --app-card-solid: #1c1c1e;
+    --app-border: rgba(255, 255, 255, 0.1);
+    --app-text: #f5f5f7;
+    --app-text-2: #98989d;
+    --app-text-3: #6e6e73;
+    --app-blue: #0a84ff;
+    --app-blue-hover: #409cff;
+    --app-blue-soft: rgba(10, 132, 255, 0.16);
+    --app-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08), 0 2px 4px rgba(0, 0, 0, 0.4), 0 8px 24px rgba(0, 0, 0, 0.5);
+    --vp-c-brand-1: #0a84ff;
+  }
+}
+html.dark {
+  --app-bg: #000;
+  --app-grad-1: #0a0a0f;
+  --app-grad-2: #1a1a22;
+  --app-card: rgba(28, 28, 30, 0.72);
+  --app-card-solid: #1c1c1e;
+  --app-border: rgba(255, 255, 255, 0.1);
+  --app-text: #f5f5f7;
+  --app-text-2: #98989d;
+  --app-text-3: #6e6e73;
+  --app-blue: #0a84ff;
+  --app-blue-hover: #409cff;
+  --app-blue-soft: rgba(10, 132, 255, 0.16);
+  --app-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08), 0 2px 4px rgba(0, 0, 0, 0.4), 0 8px 24px rgba(0, 0, 0, 0.5);
+  --vp-c-brand-1: #0a84ff;
+}
+
+html, body {
+  font-family: var(--app-font);
+  -webkit-font-smoothing: antialiased;
+}
+body {
+  background: linear-gradient(160deg, var(--app-grad-1), var(--app-grad-2));
+}
+
+/* ========== 毛玻璃降级策略 ========== */
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .app-card, .VPNavBar, .VPSidebar { background: var(--app-card-solid) !important; }
+}
+
+/* ========== 通用组件 ========== */
+.app-card {
+  background: var(--app-card);
+  -webkit-backdrop-filter: saturate(180%) blur(var(--app-blur));
+  backdrop-filter: saturate(180%) blur(var(--app-blur));
+  border: 1px solid var(--app-border);
+  border-radius: var(--app-radius);
+  box-shadow: var(--app-shadow);
+}
+.app-pill {
+  border-radius: 980px;
+  border: 1px solid var(--app-border);
+  background: var(--app-card);
+  -webkit-backdrop-filter: saturate(180%) blur(var(--app-blur));
+  backdrop-filter: saturate(180%) blur(var(--app-blur));
+  box-shadow: var(--app-shadow-sm);
+}
+
+/* ========== 按钮体系(苹果官网式) ========== */
+.app-btn {
+  display: inline-flex; align-items: center; justify-content: center;
+  border: none; border-radius: 980px; cursor: pointer;
+  font-family: var(--app-font); font-size: 14px; font-weight: 600;
+  padding: 9px 22px;
+  color: #fff;
+  background: linear-gradient(180deg, var(--app-blue-hover), var(--app-blue));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.25), 0 2px 8px rgba(0, 113, 227, 0.3);
+  transition: transform 0.15s ease, box-shadow 0.25s ease, opacity 0.2s ease;
+}
+.app-btn:active { transform: scale(0.96); box-shadow: inset 0 1px 0 rgba(255,255,255,.15), 0 1px 4px rgba(0,113,227,.2); }
+.app-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+/* 次级按钮:透明 + 蓝字 */
+.app-btn-secondary {
+  display: inline-flex; align-items: center; justify-content: center;
+  border: none; border-radius: 980px; cursor: pointer;
+  font-family: var(--app-font); font-size: 14px; font-weight: 600;
+  padding: 9px 22px;
+  background: transparent; color: var(--app-blue);
+  transition: transform 0.15s ease, background-color 0.2s ease;
+}
+.app-btn-secondary:active { transform: scale(0.96); background: var(--app-blue-soft); }
+.app-btn-secondary:disabled { opacity: 0.4; }
+
+/* 焦点可见(键盘导航无障碍) */
+:focus-visible { outline: 2px solid rgba(0, 113, 227, 0.7); outline-offset: 2px; }
+
+/* ========== 排版 ========== */
+.vp-doc { color: var(--app-text); }
+.vp-doc h1, .vp-doc h2, .vp-doc h3 { letter-spacing: -0.021em; color: var(--app-text); }
+.vp-doc p, .vp-doc li { color: var(--app-text); }
+.vp-doc h1 { font-size: var(--fs-h1); font-weight: 700; }
+.vp-doc h2 { font-size: var(--fs-h2); font-weight: 600; }
+.vp-doc h3 { font-size: var(--fs-h3); font-weight: 600; }
+.vp-doc table { border-radius: 14px; overflow: hidden; box-shadow: var(--app-shadow-sm); background: var(--app-card); }
+.vp-doc th { background: rgba(128, 128, 128, 0.08); font-size: 13px; font-weight: 600; color: var(--app-text-2); }
+.vp-doc td { border-color: rgba(0, 0, 0, 0.06); }
+.vp-doc tr:hover { background: rgba(0, 113, 227, 0.04); }
+.vp-doc blockquote { border-left: 3px solid var(--app-blue); border-radius: 0 10px 10px 0; background: var(--app-blue-soft); }
+.vp-doc div[class*="language-"] { border-radius: 14px; }
+.vp-doc a { color: var(--app-blue); }
+.vp-doc strong { color: var(--app-text); }
+
+/* 数字等宽(掌握度/倒计时对齐) */
+.num, .stat, .mastery-pct { font-variant-numeric: tabular-nums; }
+
+/* ========== 导航/侧边栏毛玻璃 ========== */
+.VPNavBar, .VPSidebar {
+  -webkit-backdrop-filter: saturate(180%) blur(var(--app-blur));
+  backdrop-filter: saturate(180%) blur(var(--app-blur));
+  background: var(--app-card) !important;
+}
+
+/* ========== 内容宽度:手机/平板/桌面 ========== */
+.VPDoc:not(.has-sidebar) .content, .VPDoc.has-sidebar .content { max-width: 860px !important; }
+@media (min-width: 960px) { .VPDoc .content-container { max-width: 900px; } }
+@media (max-width: 640px) {
+  .vp-doc { padding: 0 4px; }
+  .vp-doc h1 { font-size: 28px !important; }
+  .vp-doc h2 { font-size: 20px !important; }
+}
+
+/* ========== 无障碍:减弱动态 ========== */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* ========== 状态弹入动画(步骤条) ========== */
+@keyframes app-pop {
+  0% { transform: scale(0.5); opacity: 0; }
+  70% { transform: scale(1.12); }
+  100% { transform: scale(1); opacity: 1; }
+}
+.app-pop { animation: app-pop 0.3s cubic-bezier(0.34, 1.56, 0.64, 1); }
+
+/* ========== 错题展开(grid-rows 过渡,修 height 抖动) ========== */
+.app-expand { display: grid; grid-template-rows: 0fr; transition: grid-template-rows 0.3s cubic-bezier(0.25, 0.1, 0.25, 1); }
+.app-expand.open { grid-template-rows: 1fr; }
+.app-expand > div { overflow: hidden; }
