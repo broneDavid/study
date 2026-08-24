@@ -195,13 +195,11 @@ const MODE_LABELS = { light: '轻量', standard: '标准', intensive: '加强', 
 .mode-cancel { background: none; border: none; color: #8e8e93; font-size: 12px; cursor: pointer; margin-left: 4px; }
 .checkin-msg { font-size: 13px; color: #34c759; text-align: center; margin-top: 8px; }
 
-/* 深色模式 */
-@media (prefers-color-scheme: dark) {
-  .step { background: rgba(28,28,32,.72); border-color: rgba(255,255,255,.1); box-shadow: 0 4px 24px rgba(0,0,0,.5); }
-  .step-name { color: #f5f5f7; }
-  .step-desc { color: #98989d; }
-  .mode-opt { background: #1c1c20; }
-}
+/* 深色模式(挂 html.dark,双轨兼容) */
+html.dark .step { background: rgba(28,28,32,.72); border-color: rgba(255,255,255,.1); box-shadow: 0 4px 24px rgba(0,0,0,.5); }
+html.dark .step-name { color: #f5f5f7; }
+html.dark .step-desc { color: #98989d; }
+html.dark .mode-opt { background: #1c1c20; }
 
 /* 平板/桌面:横向 4 卡 */
 @media (min-width: 768px) {

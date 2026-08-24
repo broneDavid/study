@@ -145,7 +145,7 @@ onMounted(fetchMistakes)
 .subject-count { font-size: 12px; color: #f56c6c; font-weight: 400; margin-left: 8px; }
 .card { border: 1px solid rgba(255,255,255,.6); border-radius: 16px; padding: 12px 14px; margin: 10px 0; background: rgba(255,255,255,.72); box-shadow: 0 2px 16px rgba(0,0,0,.06);
   -webkit-backdrop-filter: saturate(180%) blur(20px); backdrop-filter: saturate(180%) blur(20px); }
-@media (prefers-color-scheme: dark) { .card { background: rgba(28,28,32,.72); border-color: rgba(255,255,255,.1); } }
+html.dark .card { background: rgba(28,28,32,.72); border-color: rgba(255,255,255,.1); }
 .card-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .date-link { background: rgba(255,149,0,.12); border: 1px solid #ff9500; color: #ff9500; border-radius: 14px; padding: 3px 10px; font-size: 12px; cursor: pointer; white-space: nowrap; }
 .date-link.open { background: #ff9500; color: #fff; }
