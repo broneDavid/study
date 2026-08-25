@@ -26,8 +26,9 @@ async function fetchToday() {
     // 预填答案对象(用数组索引做 key,不依赖 seq——seq 重复时 radio 会同名互斥丢勾选)
     answers.value = {}
     questions.value.forEach((q, qi) => answers.value[qi] = '')
-    // 恢复暂存的未提交答案(上次提交失败时存下的)
-    const draft = restoreAnswers(date.value || 'today')
+    // 恢复暂存的未提交答案(上次提交失败时存下的;带题目指纹,换题后旧草稿自动作废)
+    const fp = questions.value.map(q => q.seq).join(',')
+    const draft = restoreAnswers(date.value || 'today', fp)
     if (draft && Object.keys(draft).length) {
       let restored = 0
       questions.value.forEach((q, qi) => {
@@ -52,22 +53,31 @@ async function submit() {
     if (q.type === 'choice') parts.push(`${q.seq}${a.toUpperCase()}`)
     else parts.push(`${q.seq}${a}`)
   })
-  if (parts.length === 0) return
+  if (parts.length === 0) {
+    draftNotice.value = '⚠️ 请先作答再提交(选择或填写至少一题)'
+    return
+  }
+  draftNotice.value = ''
   const answerText = '答案：' + parts.join(' ')
 
   state.value = 'submitting'
-  // 提交前先暂存(万一失败刷新后不丢答案)
-  stashAnswers(date.value || 'today', answers.value)
+  // 提交前先暂存(万一失败刷新后不丢答案);带题目指纹,换题后旧草稿不误恢复
+  stashAnswers(date.value || 'today', answers.value, questions.value.map(q => q.seq).join(','))
   try {
     const r = await fetchWithTimeout(`${API_BASE}/grade`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'X-Quiz-Token': QUIZ_TOKEN },
       body: JSON.stringify({ answer: answerText }),
     }, 15000) // 批改可能较慢,给 15s
-    const d = await r.json()
+    const d = await r.json().catch(() => null)
+    // 统一契约:成功 {ok:true,result};失败可能是 HTTPException {detail} 或 {ok:false,result}
+    if (!r.ok || !d || d.ok !== true) {
+      const msg = d && (d.detail || d.result || d.error)
+      throw new Error(msg ? (typeof msg === 'string' ? msg : JSON.stringify(msg)) : ('HTTP ' + r.status))
+    }
     result.value = d.result || '(无结果)'
     state.value = 'done'
-    if (d.ok) clearStash(date.value || 'today')
+    clearStash(date.value || 'today')
   } catch (e) {
     state.value = 'error'
     errorMsg.value = '提交失败: ' + e.message + '(答案已暂存,刷新后可恢复,不会丢失)'
@@ -98,22 +108,26 @@ async function nextRound() {
   if (!confirm('生成下一轮学习题目？\n(需调 AI 出题,约 30-120 秒,请耐心等待)')) return
   advancing.value = true
   advanceMsg.value = ''
+  let advOk = false
   try {
     const r = await fetchWithTimeout(`${API_BASE}/advance`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'X-Quiz-Token': QUIZ_TOKEN },
       body: JSON.stringify({ count: 6 }),
     }, 180000) // AI 出题慢,给 3 分钟(此前 10s 超时导致 499 断开)
-    const d = await r.json()
-    if (d.ok) {
-      advanceMsg.value = d.idempotent ? '✅ 已有题目,无需重复生成' : `✅ 下一轮题目已就绪 (${d.pending_now || ''} 道)`
-    } else {
-      advanceMsg.value = '⚠️ ' + (d.result || '生成失败')
+    const d = await r.json().catch(() => null)
+    if (!r.ok || !d || d.ok !== true) {
+      const msg = d && (d.detail || d.result || d.error)
+      throw new Error(msg ? (typeof msg === 'string' ? msg : JSON.stringify(msg)) : ('HTTP ' + r.status))
     }
-    // 刷新题目
+    advOk = true
+    advanceMsg.value = d.idempotent ? '✅ 已有题目,无需重复生成' : `✅ 下一轮题目已就绪 (${d.pending_now || ''} 道)`
+    // 刷新题目(生成其实已成功;刷新失败不误报生成失败,提示手动刷新)
     await fetchToday()
   } catch (e) {
-    advanceMsg.value = '❌ 请求失败: ' + e.message
+    advanceMsg.value = advOk
+      ? '✅ 题目已生成,但刷新列表失败: ' + e.message + '(请手动刷新页面查看)'
+      : '❌ 请求失败: ' + e.message
   }
   advancing.value = false
 }
@@ -214,7 +228,7 @@ onMounted(fetchToday)
 .draft-notice { background: #fff8e1; border: 1px solid #e6a23c; color: #b26a00; padding: 8px 12px; border-radius: 8px; font-size: 13px; margin: 8px 0; }
 .question { border: 1px solid rgba(255,255,255,.6); border-radius: 16px; padding: 16px; margin: 12px 0; background: rgba(255,255,255,.94); box-shadow: 0 2px 16px rgba(0,0,0,.06); }
 .qhead { display: flex; gap: 8px; margin-bottom: 6px; }
-.badge { background: rgba(0,113,227,.12); color: #0071e3; color: #fff; padding: 2px 10px; border-radius: 12px; font-size: 12px; }
+.badge { background: rgba(0,113,227,.12); color: #0071e3; padding: 2px 10px; border-radius: 12px; font-size: 12px; }
 .qtype { background: #f0f0f0; padding: 2px 10px; border-radius: 12px; font-size: 12px; color: #555; }
 .qtext { font-size: 15px; margin: 8px 0; }
 .options { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; }
@@ -228,14 +242,14 @@ html.dark .opt { background: rgba(28,28,32,.6); border-color: rgba(255,255,255,.
 html.dark .opt.selected { border-color: #0a84ff; background: rgba(10,132,255,.12); }
 html.dark .opt-text { color: #f5f5f7; }
 .opt:hover { background: #f6f6f6; }
-textarea { width: 100%; border: 1px solid #ddd; border-radius: 8px; padding: 8px; font-size: 14px; font-family: inherit; }
+textarea { width: 100%; border: 1px solid #ddd; border-radius: 8px; padding: 8px; font-size: 16px; font-family: inherit; }
 .qa-area { display: flex; flex-direction: column; gap: 6px; }
 .sym-toolbar { display: flex; justify-content: flex-start; }
 .sym-toggle { background: #f0f0f0; color: #444; padding: 5px 12px; border-radius: 6px; font-size: 13px; cursor: pointer; }
 .sym-toggle:hover { background: #e4e4e4; }
 .sym-panel { display: flex; flex-wrap: wrap; gap: 4px; padding: 6px; background: #fafafa; border: 1px solid #eee; border-radius: 8px; height: 0; margin: 0; overflow: hidden; visibility: hidden; }
 .sym-panel.open { height: auto; margin: 0 0 8px; visibility: visible; }
-.sym-btn { background: #fff; border: 1px solid #ddd; border-radius: 5px; padding: 4px 8px; font-size: 15px; cursor: pointer; min-width: 36px; font-family: "SF Pro Text", -apple-system, "PingFang SC", "Segoe UI Symbol", "Apple Symbols", sans-serif; }
+.sym-btn { background: #fff; border: 1px solid #ddd; border-radius: 5px; padding: 7px 10px; font-size: 15px; cursor: pointer; min-width: 40px; min-height: 40px; font-family: "SF Pro Text", -apple-system, "PingFang SC", "Segoe UI Symbol", "Apple Symbols", sans-serif; }
 .sym-btn:hover { background: #0071e3; color: #fff; border-color: #0071e3; }
 .actions { text-align: center; margin-top: 16px; }
 .advance-area { text-align: center; margin-top: 10px; padding-top: 10px; border-top: 1px dashed #ddd; }
@@ -248,4 +262,16 @@ button:disabled { opacity: .5; cursor: not-allowed; }
 .result { border: 1px solid rgba(0,113,227,.3); border-radius: 14px; padding: 16px; background: rgba(0,113,227,.05); }
 .result pre { white-space: pre-wrap; background: #f6f6f6; padding: 12px; border-radius: 8px; }
 html.dark .question { background: rgba(28,28,32,.72); border-color: rgba(255,255,255,.1); }
+/* 深色模式覆盖:徽章/类型/草稿提示/符号面板/结果/输入框(挂 html.dark,双轨兼容) */
+html.dark .badge { color: #0a84ff; }
+html.dark .qtype { background: #2c2c2e; color: #aeaeb2; }
+html.dark .draft-notice { background: rgba(255,200,87,.12); border-color: rgba(255,200,87,.35); color: #ffd60a; }
+html.dark .sym-toggle { background: #2c2c2e; color: #d0d0d4; }
+html.dark .sym-toggle:hover { background: #3a3a3c; }
+html.dark .sym-panel { background: #1c1c20; border-color: #2c2c2e; }
+html.dark .sym-btn { background: #2c2c2e; border-color: #3a3a3c; color: #f5f5f7; }
+html.dark .sym-btn:hover { background: #0a84ff; color: #fff; border-color: #0a84ff; }
+html.dark .result pre { background: #1c1c20; color: #f5f5f7; }
+html.dark textarea { background: #1c1c20; border-color: #3a3a3c; color: #f5f5f7; }
+html.dark .advance-area { border-top-color: #2c2c2e; }
 </style>

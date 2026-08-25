@@ -1,7 +1,8 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { fetchWithTimeout } from './fetchUtil.js'
-import { API_BASE, QUIZ_TOKEN } from './apiConfig.js'
+import { API_BASE, QUIZ_TOKEN, BASE_URL } from './apiConfig.js'
+const base = BASE_URL
 
 const loading = ref(true)
 const status = ref(null)
@@ -46,13 +47,15 @@ async function doCheckin(m) {
       headers: { 'Content-Type': 'application/json', 'X-Quiz-Token': QUIZ_TOKEN },
       body: JSON.stringify({ mode: m }),
     })
-    const d = await r.json()
-    if (d.ok) {
+    const d = await r.json().catch(() => null)
+    // 统一契约:成功 {ok:true};失败可能是 HTTPException {detail} 或 {ok:false,result}
+    if (!r.ok || !d || d.ok !== true) {
+      const err = d && (d.detail || d.result || d.error)
+      checkinMsg.value = '⚠️ ' + (err ? (typeof err === 'string' ? err : JSON.stringify(err)) : ('HTTP ' + r.status))
+    } else {
       picking.value = false
       checkinMsg.value = `✅ 打卡成功 · 今日${MODES[m]?.label || m}模式`
       await fetchStatus()
-    } else {
-      checkinMsg.value = '⚠️ ' + (d.result || '打卡失败')
     }
   } catch (e) {
     checkinMsg.value = '❌ 请求失败: ' + e.message
@@ -110,7 +113,7 @@ const MODE_LABELS = { light: '轻量', standard: '标准', intensive: '加强', 
           <div class="step-chev">›</div>
         </div>
 
-        <a class="step link" :class="status.lesson_done ? 'done' : (status.checkin_done ? 'active' : 'todo')" href="/study/daily#today-lesson">
+        <a class="step link" :class="status.lesson_done ? 'done' : (status.checkin_done ? 'active' : 'todo')" :href="base + 'daily#today-lesson'">
           <div class="step-icon">{{ status.lesson_done ? '✓' : '2' }}</div>
           <div class="step-body">
             <div class="step-name">学习知识点</div>
@@ -119,16 +122,16 @@ const MODE_LABELS = { light: '轻量', standard: '标准', intensive: '加强', 
           <div class="step-chev">›</div>
         </a>
 
-        <a class="step link" :class="status.quiz_done ? 'done' : (status.checkin_done && status.lesson_done ? 'active' : 'todo')" href="/study/quiz">
+        <a class="step link" :class="status.quiz_done ? 'done' : (status.checkin_done && status.lesson_done ? 'active' : 'todo')" :href="base + 'quiz'">
           <div class="step-icon">{{ status.quiz_done ? '✓' : '3' }}</div>
           <div class="step-body">
             <div class="step-name">在线小测</div>
-            <div class="step-desc">{{ status.quiz_done ? '已完成' : '6 题 · AI 批改 + 解析' }}</div>
+            <div class="step-desc">{{ status.quiz_done ? '已完成' : 'AI 批改 + 解析' }}</div>
           </div>
           <div class="step-chev">›</div>
         </a>
 
-        <a class="step link" :class="status.review_done ? 'done' : 'todo'" href="/study/mistakes">
+        <a class="step link" :class="status.review_done ? 'done' : 'todo'" :href="base + 'mistakes'">
           <div class="step-icon">{{ status.review_done ? '✓' : '4' }}</div>
           <div class="step-body">
             <div class="step-name">复盘错题</div>
@@ -189,7 +192,7 @@ const MODE_LABELS = { light: '轻量', standard: '标准', intensive: '加强', 
 .mini-btn { padding: 6px 16px; border: none; border-radius: 980px; background: linear-gradient(180deg, #0077ed, #0071e3); color: #fff; font-size: 13px; cursor: pointer; box-shadow: inset 0 1px 0 rgba(255,255,255,.25), 0 2px 8px rgba(0,113,227,.3); transition: transform .15s ease; }
 .mini-btn:active { transform: scale(.96); }
 .mode-picker { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
-.mode-opt { background: #fff; border: 1.5px solid; border-radius: 980px; padding: 6px 12px; font-size: 12px; cursor: pointer; }
+.mode-opt { background: #fff; border: 1.5px solid; border-radius: 980px; padding: 8px 16px; font-size: 13px; cursor: pointer; min-height: 40px; }
 .mode-opt:disabled { opacity: .5; }
 .mode-cancel { background: none; border: none; color: #8e8e93; font-size: 12px; cursor: pointer; margin-left: 4px; }
 .checkin-msg { font-size: 13px; color: #34c759; text-align: center; margin-top: 8px; }

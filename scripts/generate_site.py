@@ -282,7 +282,7 @@ def reports_to_markdown():
     index.append("|------|------|")
     for f in files:
         name = f.replace(".pdf", "").replace("周报_", "").replace(".", "-W")
-        index.append(f"| {name} | [下载 {f}]({'/assets/weekly/' + f}) |")
+        index.append(f"| {name} | [下载 {f}]({'/weekly/' + f}) |")
     index.append("")
 
     index.append("## 说明")
@@ -629,7 +629,7 @@ def daily_to_markdown():
     cal_html, streak, cal_total = _calendar_heatmap()
     lines.append("## 📅 打卡日历(近 90 天)")
     lines.append("")
-    lines.append(f"> 🔥 **连续学习 {streak} 天** · 近 90 天打卡 {cal_total} 天 · 绿=已打卡 橙框=今天")
+    lines.append(f"> 🔥 **连续学习 {streak} 天** · 近 90 天打卡 {cal_total} 天 · 绿=已打卡 蓝框=今天")
     lines.append("")
     lines.append(cal_html)
     lines.append("")
@@ -659,7 +659,9 @@ def home_to_markdown():
     lines.append("# 启的考研笔记 🏷️")
     lines.append("")
     days, stage = _exam_countdown()
-    lines.append("> **考研备考:** 数学一 · 机械原理 · 英语一 · 炼油化工设备\\n> **考研倒计时: {} 天 · {}阶段**\\n📌 本网站由学习系统自动生成, 每日更新。".format(days, stage))
+    lines.append("> **考研备考:** 数学一 · 机械原理 · 英语一 · 炼油化工设备")
+    lines.append(f"> **考研倒计时: {days} 天 · {stage}阶段**")
+    lines.append("> 📌 本网站由学习系统自动生成, 每日更新。")
     lines.append("")
     lines.append("**👉 今天学什么? 去 [每日学习](/daily) 看今日任务与知识点。**")
     lines.append("")
@@ -670,9 +672,9 @@ def home_to_markdown():
         icon = SUBJECT_ICONS.get(subj, "📘")
         data2 = load_json(os.path.join(STUDY_DIR, "knowledge", f"{subj}.json"), {"items": []})
         cnt = len(data2.get("items", []))
-        lines.append(f'<a href="/study/subjects/{subj}" style="display:block;background:#fff;border:1px solid #e0e0e0;border-radius:10px;padding:14px;text-decoration:none;color:#333;box-shadow:0 1px 3px rgba(0,0,0,.06);">'
+        lines.append(f'<a href="/study/subjects/{subj}" class="subj-card">'
                      f'<div style="font-size:16px;font-weight:600;">{icon} {subj}</div>'
-                     f'<div style="font-size:13px;color:#888;margin-top:4px;">{cnt} 个知识点</div></a>')
+                     f'<div style="font-size:13px;color:#86868b;margin-top:4px;">{cnt} 个知识点</div></a>')
     lines.append('</div>')
     lines.append("")
     lines.append("## 🧭 快捷入口")
@@ -680,7 +682,7 @@ def home_to_markdown():
     lines.append("| 页面 | 说明 |")
     lines.append("|------|------|")
     lines.append("| [📅 每日学习](/daily) | 今日任务 · 知识点 · 到期复习 |")
-    lines.append("| [✏️ 在线小测](/quiz) | 每日 6 题 · 即时批改 · 解题步骤 |")
+    lines.append("| [✏️ 在线小测](/quiz) | AI 出题 · 即时批改 · 解题步骤 |")
     lines.append("| [❌ 错题本](/mistakes) | 按科目分组 · 点日期看解析 |")
     lines.append("| [📈 学习进度](/progress) | 掌握度 · 打卡日历 · 里程碑 |")
     lines.append("| [🗓️ 学习计划](/plan) | 考研三阶段计划 · 科目轮换 |")
@@ -706,16 +708,25 @@ def main():
         print(f"❌ 学习数据目录不存在或知识库缺失: {STUDY_DIR}")
         print("   本生成器只在有学习数据的机器上运行(本地 y7000)。真实部署: ./scripts/build.sh deploy")
         sys.exit(2)
+    # 2026-08-25 加固:知识库存在但全空(坏写/误清空)也禁止生成——
+    # 否则会构建"知识库还是空的"占位页并部署,覆盖线上真站。
+    total_items = 0
+    for subj in SUBJECTS:
+        kb = load_json(os.path.join(STUDY_DIR, "knowledge", f"{subj}.json"), {"items": []})
+        total_items += len(kb.get("items", []))
+    if total_items == 0:
+        print(f"❌ 知识库存在但条目数为 0({STUDY_DIR}/knowledge),疑似坏写/误清空,禁止生成空壳站")
+        sys.exit(2)
 
     # 清理上一次生成(仅删除我们生成的文件)
-    for sub in ["subjects", "reports", "assets/weekly"]:
+    for sub in ["subjects", "reports", "public/weekly"]:
         d = os.path.join(OUT_DIR, sub)
         if os.path.isdir(d):
             shutil.rmtree(d)
 
     ensure_dir(os.path.join(OUT_DIR, "subjects"))
     ensure_dir(os.path.join(OUT_DIR, "reports"))
-    ensure_dir(os.path.join(OUT_DIR, "assets", "weekly"))
+    ensure_dir(os.path.join(OUT_DIR, "public", "weekly"))
     ensure_dir(os.path.join(OUT_DIR, "assets", "diagrams"))
 
     # 复制图示(图文并茂)到网站 assets/diagrams/
@@ -762,14 +773,14 @@ def main():
         rep_index, files = reports_to_markdown()
         with open(os.path.join(OUT_DIR, "reports", "index.md"), "w", encoding="utf-8") as f:
             f.write("\n".join(rep_index))
-        # 拷贝周报 PDF 到静态资源(供下载)
+        # 拷贝周报 PDF 到 public/weekly(VitePress 原样复制进 dist,供下载;assets/ 下的孤儿文件不会被打包)
         if os.path.isdir(WEEKLY_DIR):
             for fn in files:
                 src = os.path.join(WEEKLY_DIR, fn)
-                dst = os.path.join(OUT_DIR, "assets", "weekly", fn)
+                dst = os.path.join(OUT_DIR, "public", "weekly", fn)
                 if os.path.isfile(src):
                     shutil.copy2(src, dst)
-        print(f"✅ 周报: 拷贝 {len(files)} 份 PDF 到 assets/weekly/")
+        print(f"✅ 周报: 拷贝 {len(files)} 份 PDF 到 public/weekly/")
     else:
         with open(os.path.join(OUT_DIR, "reports", "index.md"), "w", encoding="utf-8") as f:
             f.write("# 📅 每周周报\n\n> 每周自动生成的备考进度周报。\n")

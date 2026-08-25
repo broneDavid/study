@@ -9,6 +9,7 @@ const items = ref([])         // 未解决错题
 const expanded = ref({})      // point -> bool
 const msg = ref('')
 const errorMsg = ref('')
+const busyPoints = ref([])    // 防连点:处理中的 point 列表
 
 const SUBJECTS = ['高等数学', '机械原理', '英语', '炼油化工设备']
 const SUBJ_ICONS = { '高等数学': '📘', '机械原理': '⚙️', '英语': '🇬🇧', '炼油化工设备': '🏭' }
@@ -44,15 +45,19 @@ function toggleExpand(it) {
 }
 
 async function resolveIt(it, resolved) {
+  if (busyPoints.value.includes(it.point)) return  // 防连点
+  busyPoints.value.push(it.point)
   try {
     const r = await fetchWithTimeout(`${API_BASE}/mistakes/resolve`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'X-Quiz-Token': QUIZ_TOKEN },
       body: JSON.stringify({ subject: it.subject, point: it.point, resolved }),
     })
-    const d = await r.json()
-    if (!d.ok) {
-      msg.value = '⚠️ ' + (d.result || '操作失败')
+    const d = await r.json().catch(() => null)
+    // 统一契约:成功 {ok:true};失败可能是 HTTPException {detail} 或 {ok:false,result}
+    if (!r.ok || !d || d.ok !== true) {
+      const err = d && (d.detail || d.result || d.error)
+      msg.value = '⚠️ ' + (err ? (typeof err === 'string' ? err : JSON.stringify(err)) : ('HTTP ' + r.status))
       return
     }
     items.value = items.value.filter(x => !(x.subject === it.subject && x.point === it.point))
@@ -60,6 +65,8 @@ async function resolveIt(it, resolved) {
     msg.value = resolved ? '🎉 已标记解决,从错题本移除' : '🔁 已标记"还不会",继续保持复习'
   } catch (e) {
     msg.value = '❌ 操作失败: ' + e.message
+  } finally {
+    busyPoints.value = busyPoints.value.filter(p => p !== it.point)
   }
 }
 
@@ -120,8 +127,8 @@ onMounted(fetchMistakes)
                     ⚠️ 暂无答案与解析,建议回对应科目笔记页复习该知识点后再标记。
                   </p>
                   <div class="actions">
-                    <button class="btn-no" @click="resolveIt(it, false)">🔁 还不会</button>
-                    <button class="btn-yes" @click="resolveIt(it, true)">✅ 记住了</button>
+                    <button class="btn-no" :disabled="busyPoints.includes(it.point)" @click="resolveIt(it, false)">🔁 还不会</button>
+                    <button class="btn-yes" :disabled="busyPoints.includes(it.point)" @click="resolveIt(it, true)">✅ 记住了</button>
                   </div>
                 </div>
               </div>
@@ -146,8 +153,20 @@ onMounted(fetchMistakes)
 .card { border: 1px solid rgba(255,255,255,.6); border-radius: 16px; padding: 12px 14px; margin: 10px 0; background: rgba(255,255,255,.94); box-shadow: 0 2px 16px rgba(0,0,0,.06);
   }
 html.dark .card { background: rgba(28,28,32,.72); border-color: rgba(255,255,255,.1); }
+/* 深色模式覆盖:正文/答案/解析/知识点/分割线全部挂 html.dark(此前只有 .card 一条,夜间不可读) */
+html.dark .point { color: #f5f5f7; }
+html.dark .qtext { color: #e8e8ea; }
+html.dark .solution-text { color: #e8e8ea; }
+html.dark .answer-text { background: rgba(52,199,89,.15); color: #34c759; }
+html.dark .knowledge-box { background: rgba(10,132,255,.12); border-color: rgba(10,132,255,.3); }
+html.dark .knowledge-title { color: #64b5f6; }
+html.dark .knowledge-content { color: #e8e8ea; }
+html.dark .knowledge-example { color: #aeaeb2; }
+html.dark .subject-title { border-color: #2c2c2e; }
+html.dark .detail { border-color: #2c2c2e; }
+html.dark .actions button:disabled { opacity: .5; cursor: not-allowed; }
 .card-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-.date-link { background: rgba(255,149,0,.12); border: 1px solid #ff9500; color: #ff9500; border-radius: 14px; padding: 3px 10px; font-size: 12px; cursor: pointer; white-space: nowrap; }
+.date-link { background: rgba(255,149,0,.12); border: 1px solid #ff9500; color: #ff9500; border-radius: 14px; padding: 8px 12px; font-size: 13px; cursor: pointer; white-space: nowrap; }
 .date-link.open { background: #ff9500; color: #fff; }
 .point { font-size: 14px; font-weight: 600; color: #333; }
 .detail { margin-top: 8px; padding-top: 8px; border-top: 1px dashed #e0e0e0; }

@@ -53,6 +53,22 @@ EOF
     git push -q -f https://github.com/broneDavid/study.git gh-pages
   echo "✅ [3/3] 部署完成: https://bronedavid.github.io/study/"
   rm -rf "$DEPLOY"
+
+  # 2026-08-25 新增:部署后校验(线上首页 200 + 最新周报 PDF 可达),失败告警不阻断
+  HOME_CODE=$(curl -s -o /dev/null -w "%{http_code}" --max-time 20 "https://bronedavid.github.io/study/" || true)
+  LATEST_PDF=$(ls -t docs/.vitepress/dist/weekly/*.pdf 2>/dev/null | head -1 | xargs -r basename)
+  PDF_CODE=000
+  if [ -n "$LATEST_PDF" ]; then
+    PDF_CODE=$(curl -s -o /dev/null -w "%{http_code}" --max-time 20 "https://bronedavid.github.io/study/weekly/$LATEST_PDF" || true)
+  fi
+  if [ "$HOME_CODE" != "200" ]; then
+    echo "⚠️ 部署后校验:线上首页返回 $HOME_CODE(异常,请检查 GitHub Pages)"
+  else
+    echo "✅ 部署后校验:首页 200"
+  fi
+  if [ -n "$LATEST_PDF" ] && [ "$PDF_CODE" != "200" ]; then
+    echo "⚠️ 部署后校验:周报 PDF($LATEST_PDF)线上返回 $PDF_CODE(拷贝链路异常)"
+  fi
 else
   echo "==> [3/3] 跳过部署 (加 deploy 参数可推送 GitHub Pages)"
 fi

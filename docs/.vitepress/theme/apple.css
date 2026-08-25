@@ -200,3 +200,7 @@ body {
 .app-expand { display: grid; grid-template-rows: 0fr; transition: grid-template-rows 0.3s cubic-bezier(0.25, 0.1, 0.25, 1); }
 .app-expand.open { grid-template-rows: 1fr; }
 .app-expand > div { overflow: hidden; }
+
+/* ========== 首页学科卡片(生成器输出 class,深色双轨) ========== */
+.subj-card { display: block; background: #fff; border: 1px solid #e0e0e0; border-radius: 10px; padding: 14px; text-decoration: none; color: #333; box-shadow: 0 1px 3px rgba(0,0,0,.06); }
+html.dark .subj-card { background: #1c1c20; border-color: #2c2c2e; color: #f5f5f7; }

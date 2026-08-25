@@ -16,17 +16,24 @@ export async function fetchWithTimeout(url, options = {}, timeoutMs = 10000) {
   }
 }
 
-// 答案暂存(sessionStorage):提交失败/超时时保存,刷新后可恢复
-export function stashAnswers(key, answers) {
+// 答案暂存(sessionStorage):提交失败/超时时保存,刷新后可恢复。
+// 带题目指纹(seq 列表):换题后旧草稿不误恢复(否则答案会错位到新题同下标位置)。
+export function stashAnswers(key, answers, fingerprint) {
   try {
-    sessionStorage.setItem('quiz_draft_' + key, JSON.stringify(answers))
+    sessionStorage.setItem('quiz_draft_' + key, JSON.stringify({ fp: fingerprint || '', answers }))
   } catch (e) { /* ignore */ }
 }
 
-export function restoreAnswers(key) {
+export function restoreAnswers(key, fingerprint) {
   try {
     const raw = sessionStorage.getItem('quiz_draft_' + key)
-    return raw ? JSON.parse(raw) : null
+    if (!raw) return null
+    const d = JSON.parse(raw)
+    if (!d || typeof d !== 'object') return null
+    // 旧格式(纯 answers 对象,无 fp)或指纹不匹配(题目已换)→ 草稿作废,防错位
+    if (d.fp === undefined) return null
+    if (fingerprint && d.fp !== fingerprint) return null
+    return d.answers || null
   } catch (e) {
     return null
   }

@@ -1,12 +1,12 @@
 # 📈 学习进度
 
-> 累计学习 **8** 天 · 最近更新 2026-08-24
+> 累计学习 **9** 天 · 最近更新 2026-08-25
 
 ## 各科掌握度
 
-### 📘 高等数学 — 40%
+### 📘 高等数学 — 50%
 
-> ████░░░░░░ · 连击 11 天
+> █████░░░░░ · 连击 12 天
 
 **已掌握要点:**
 
@@ -16,21 +16,21 @@
 - 定积分的换元积分法
 - 求极限(洛必达法则重难点)
 
-### ⚙️ 机械原理 — 40%
+### ⚙️ 机械原理 — 20%
 
-> ████░░░░░░ · 连击 11 天
+> ██░░░░░░░░ · 连击 12 天
 
 **已掌握要点:**
 
-- 局部自由度陷阱(凸轮滚子)
 - 局部自由度陷阱(重复错误×2)
 - 速度瞬心法的应用(ω3计算+P13作图)
 - 标准直齿圆柱齿轮几何尺寸计算
 - 平面机构自由度计算
+- 定轴轮系传动比计算
 
 ### 🇬🇧 英语 — 100%
 
-> ██████████ · 连击 11 天
+> ██████████ · 连击 12 天
 
 **已掌握要点:**
 
@@ -40,17 +40,17 @@
 - distinguish between A and B 区分
 - attribute A to B 归因于
 
-### 🏭 炼油化工设备 — 80%
+### 🏭 炼油化工设备 — 60%
 
-> ████████░░ · 连击 11 天
+> ██████░░░░ · 连击 12 天
 
 **已掌握要点:**
 
-- 离心泵的工作原理
 - 离心泵气蚀(汽蚀)现象
 - 离心泵启动故障判断(气缚变体)
 - 泵类型选型(三泵原理变体)
 - 气缚与气蚀的本质区别(变体)
+- 离心泵气缚与气蚀辨析
 
 
 <style>
@@ -63,14 +63,13 @@
 
 ## 掌握度总览
 
-<div class="mastery-row"><span class="label">📘 高等数学</span><div class="mastery-bar"><div class="mastery-fill" style="width:40%"></div></div><span class="mastery-val">40%</span></div>
-<div class="mastery-row"><span class="label">⚙️ 机械原理</span><div class="mastery-bar"><div class="mastery-fill" style="width:40%"></div></div><span class="mastery-val">40%</span></div>
+<div class="mastery-row"><span class="label">📘 高等数学</span><div class="mastery-bar"><div class="mastery-fill" style="width:50%"></div></div><span class="mastery-val">50%</span></div>
+<div class="mastery-row"><span class="label">⚙️ 机械原理</span><div class="mastery-bar"><div class="mastery-fill" style="width:20%"></div></div><span class="mastery-val">20%</span></div>
 <div class="mastery-row"><span class="label">🇬🇧 英语</span><div class="mastery-bar"><div class="mastery-fill" style="width:100%"></div></div><span class="mastery-val">100%</span></div>
-<div class="mastery-row"><span class="label">🏭 炼油化工设备</span><div class="mastery-bar"><div class="mastery-fill" style="width:80%"></div></div><span class="mastery-val">80%</span></div>
+<div class="mastery-row"><span class="label">🏭 炼油化工设备</span><div class="mastery-bar"><div class="mastery-fill" style="width:60%"></div></div><span class="mastery-val">60%</span></div>
 
 ## 最近学习要点
 
-- 🇬🇧 **英语** — attribute A to B 归因于
 - 🏭 **炼油化工设备** — 离心泵vs齿轮泵vs往复泵原理
 - 🏭 **炼油化工设备** — 三泵原理混淆(重复错误×2)
 - 🏭 **炼油化工设备** — 泵启动准备:连续2次漏灌泵排气
@@ -80,3 +79,4 @@
 - 🏭 **炼油化工设备** — 离心泵启动故障判断(气缚变体)
 - 🏭 **炼油化工设备** — 泵类型选型(三泵原理变体)
 - 🏭 **炼油化工设备** — 气缚与气蚀的本质区别(变体)
+- 🏭 **炼油化工设备** — 离心泵气缚与气蚀辨析
