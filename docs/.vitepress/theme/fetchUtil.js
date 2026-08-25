@@ -16,25 +16,27 @@ export async function fetchWithTimeout(url, options = {}, timeoutMs = 10000) {
   }
 }
 
-// 答案暂存(localStorage):提交失败/超时/部分未判时保存,刷新或换标签页后均可恢复。
-// 用 localStorage 而非 sessionStorage:跨标签页保留,关标签重开也不丢。
-// 带题目指纹(seq 列表):换题后旧草稿不误恢复(否则答案会错位到新题同下标位置)。
-// 注意:旧版 sessionStorage 草稿不迁移(指纹格式相同,但仅同标签页会话内有效,过期即弃)。
-export function stashAnswers(key, answers, fingerprint) {
+// 题目身份 uid: subject|seq|title —— 与后端 store 去重键一致,身份稳定。
+// 批改移除已判题、cron 追加新题、advance 换题都不会改变"仍在待批单中的题"的 uid。
+export function answerUid(q) {
+  return (q.subject || '') + '|' + (q.seq || '') + '|' + (q.title || '')
+}
+
+// 答案暂存 v2(localStorage):按题目 uid 存储,部分批改/追加题目后仍能按题恢复。
+// 旧版(v1:数组下标 + 题集指纹)在"部分题目批改成功、其余未判"后刷新时整体失配,
+// 未判题的答案被丢弃——v2 按 uid 逐题回填,天然正确。v1 草稿直接弃用。
+export function stashAnswers(key, answersByUid) {
   try {
-    localStorage.setItem('quiz_draft_' + key, JSON.stringify({ fp: fingerprint || '', answers }))
+    localStorage.setItem('quiz_draft_' + key, JSON.stringify({ v: 2, answers: answersByUid || {} }))
   } catch (e) { /* ignore */ }
 }
 
-export function restoreAnswers(key, fingerprint) {
+export function restoreAnswers(key) {
   try {
     const raw = localStorage.getItem('quiz_draft_' + key)
     if (!raw) return null
     const d = JSON.parse(raw)
-    if (!d || typeof d !== 'object') return null
-    // 旧格式(纯 answers 对象,无 fp)或指纹不匹配(题目已换)→ 草稿作废,防错位
-    if (d.fp === undefined) return null
-    if (fingerprint && d.fp !== fingerprint) return null
+    if (!d || typeof d !== 'object' || d.v !== 2) return null
     return d.answers || null
   } catch (e) {
     return null

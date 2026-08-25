@@ -1,6 +1,6 @@
 <script setup>
 import { ref, onMounted } from 'vue'
-import { fetchWithTimeout, stashAnswers, restoreAnswers, clearStash } from './fetchUtil.js'
+import { fetchWithTimeout, stashAnswers, restoreAnswers, clearStash, answerUid } from './fetchUtil.js'
 import { API_BASE, QUIZ_TOKEN } from './apiConfig.js'
 
 // 轻量访问 token(集中管理于 apiConfig.js)
@@ -17,6 +17,7 @@ const draftNotice = ref('')  // 暂存提示
 async function fetchToday() {
   state.value = 'loading'
   errorMsg.value = ''
+  draftNotice.value = ''
   try {
     // today 为公开读(无答案),无需 token
     const r = await fetchWithTimeout(`${API_BASE}/today`)
@@ -28,13 +29,14 @@ async function fetchToday() {
     // 预填答案对象(用数组索引做 key,不依赖 seq——seq 重复时 radio 会同名互斥丢勾选)
     answers.value = {}
     questions.value.forEach((q, qi) => answers.value[qi] = '')
-    // 恢复暂存的未提交答案(上次提交失败/未判完时存下的;带题目指纹,换题后旧草稿自动作废)
-    const fp = questions.value.map(q => q.seq).join(',')
-    const draft = restoreAnswers(date.value || 'today', fp)
+    // 恢复暂存的未提交答案(v2 按题 uid 逐条回填:部分批改/追加新题后未判题的答案仍能恢复;
+    // 旧版按数组下标+题集指纹,部分批改后整体失配导致答案丢失)
+    const draft = restoreAnswers(date.value || 'today')
     if (draft && Object.keys(draft).length) {
       let restored = 0
       questions.value.forEach((q, qi) => {
-        if (draft[qi]) { answers.value[qi] = draft[qi]; restored++ }
+        const a = draft[answerUid(q)]
+        if (a) { answers.value[qi] = a; restored++ }
       })
       if (restored > 0) draftNotice.value = `📝 已恢复上次未提交的 ${restored} 题答案,可直接提交或修改`
     }
@@ -63,14 +65,19 @@ async function submit() {
   const answerText = '答案：' + parts.join(' ')
 
   state.value = 'submitting'
-  // 提交前先暂存(万一失败/未判完刷新后不丢答案);带题目指纹,换题后旧草稿不误恢复
-  stashAnswers(date.value || 'today', answers.value, questions.value.map(q => q.seq).join(','))
+  // 提交前暂存(v2 按题 uid:部分批改后未判题的答案仍能按题恢复)
+  const uidAnswers = {}
+  questions.value.forEach((q, qi) => {
+    const a = (answers.value[qi] || '').trim()
+    if (a) uidAnswers[answerUid(q)] = a
+  })
+  stashAnswers(date.value || 'today', uidAnswers)
   try {
     const r = await fetchWithTimeout(`${API_BASE}/grade`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'X-Quiz-Token': QUIZ_TOKEN },
       body: JSON.stringify({ answer: answerText }),
-    }, 15000) // 批改可能较慢,给 15s
+    }, 90000) // 批改可能较慢(AI 单题最坏 ~65s),给 90s(此前 15s 几乎必然超时)
     const d = await r.json().catch(() => null)
     // 统一契约:成功 {ok:true,result,pending_remaining};失败可能是 HTTPException {detail} 或 {ok:false,result}
     if (!r.ok || !d || d.ok !== true) {
@@ -80,17 +87,17 @@ async function submit() {
     result.value = d.result || '(无结果)'
     state.value = 'done'
     // 仅当没有剩余未判题(全部批改完成)才清除草稿;
-    // 若仍有未判题(如 AI 暂不可用/部分格式未匹配),保留草稿,刷新后自动恢复,避免重填。
+    // 若仍有未判题(如 AI 暂不可用/部分格式未匹配),保留草稿,刷新后按 uid 自动恢复,避免重填。
     if (d.pending_remaining === 0) {
       clearStash(date.value || 'today')
     } else {
       draftNotice.value = '⚠️ 部分题目未判(AI 暂不可用或格式未匹配),你的答案已保存,可稍后重新提交'
     }
-    // 刷新已批改列表(刚批完的题立刻出现在"今日已批改")
-    fetchToday()
+    // 注意:此处不再调用 fetchToday()——旧实现同步把 state 改回 loading,导致
+    // "批改结果"页永远不渲染(死代码)。停留 done 页展示完整批改结果,点"继续下一批"再刷新。
   } catch (e) {
     state.value = 'error'
-    errorMsg.value = '提交失败: ' + e.message + '(答案已暂存,刷新后可恢复,不会丢失)'
+    errorMsg.value = '提交失败: ' + e.message + '(答案已保存,刷新后可恢复;若为连接超时,批改可能仍在后台进行,稍后刷新页面即可看到结果)'
   }
 }
 
@@ -142,7 +149,15 @@ async function nextRound() {
   advancing.value = false
 }
 
-onMounted(fetchToday)
+onMounted(() => {
+  fetchToday()
+  // 双标签页同步:另一标签页 stash/clear 草稿时,本页自动刷新题目与已批改列表
+  window.addEventListener('storage', (e) => {
+    if (e.key && e.key.startsWith('quiz_draft_') && state.value !== 'submitting') {
+      fetchToday()
+    }
+  })
+})
 </script>
 
 <template>
