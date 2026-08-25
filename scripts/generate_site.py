@@ -499,21 +499,14 @@ def daily_to_markdown():
             lines.append(f"- {SUBJECT_ICONS.get(s,'')} **{s}**:知识库 {n} 条 · [查看笔记](/subjects/{s})")
     lines.append("")
 
-    # 到期复习
+    # 到期复习(2026-08-25 改为引导:列表已整合进 /map 复习地图实时队列,避免重复展示旧文案)
     due = _due_items()
     lines.append("## ⏰ 到期复习")
     lines.append("")
     if due:
-        lines.append(f"**{len(due)} 条知识到期**,按间隔复习(SM-2),优先复习再学新的:")
-        lines.append("")
-        for subj, it in due[:12]:
-            icon = SUBJECT_ICONS.get(subj, "📘")
-            m = it.get("mastery", 0)
-            lines.append(f"- {icon} **{subj}** · {it.get('title','')}(掌握 {m}%)")
-        if len(due) > 12:
-            lines.append(f"- ...共 {len(due)} 条")
+        lines.append(f"**今日 {len(due)} 条知识到期**(FSRS 调度)。去 [🧭 复习地图](/map) 看实时队列,按掌握度薄弱优先:")
     else:
-        lines.append("> 🎉 今天没有到期复习,轻松学新知识!")
+        lines.append("> 🎉 今天没有到期复习,轻松学新知识!去 [🧭 复习地图](/map) 看全部知识点与掌握度。")
     lines.append("")
 
     # 今日知识点(带锚点,任务卡"知识点"跳这里;周日也显示,作为本周回顾)
