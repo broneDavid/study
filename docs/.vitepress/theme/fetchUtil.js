@@ -16,17 +16,19 @@ export async function fetchWithTimeout(url, options = {}, timeoutMs = 10000) {
   }
 }
 
-// 答案暂存(sessionStorage):提交失败/超时时保存,刷新后可恢复。
+// 答案暂存(localStorage):提交失败/超时/部分未判时保存,刷新或换标签页后均可恢复。
+// 用 localStorage 而非 sessionStorage:跨标签页保留,关标签重开也不丢。
 // 带题目指纹(seq 列表):换题后旧草稿不误恢复(否则答案会错位到新题同下标位置)。
+// 注意:旧版 sessionStorage 草稿不迁移(指纹格式相同,但仅同标签页会话内有效,过期即弃)。
 export function stashAnswers(key, answers, fingerprint) {
   try {
-    sessionStorage.setItem('quiz_draft_' + key, JSON.stringify({ fp: fingerprint || '', answers }))
+    localStorage.setItem('quiz_draft_' + key, JSON.stringify({ fp: fingerprint || '', answers }))
   } catch (e) { /* ignore */ }
 }
 
 export function restoreAnswers(key, fingerprint) {
   try {
-    const raw = sessionStorage.getItem('quiz_draft_' + key)
+    const raw = localStorage.getItem('quiz_draft_' + key)
     if (!raw) return null
     const d = JSON.parse(raw)
     if (!d || typeof d !== 'object') return null
@@ -41,6 +43,6 @@ export function restoreAnswers(key, fingerprint) {
 
 export function clearStash(key) {
   try {
-    sessionStorage.removeItem('quiz_draft_' + key)
+    localStorage.removeItem('quiz_draft_' + key)
   } catch (e) { /* ignore */ }
 }

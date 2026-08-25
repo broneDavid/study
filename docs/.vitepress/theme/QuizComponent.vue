@@ -8,6 +8,7 @@ import { API_BASE, QUIZ_TOKEN } from './apiConfig.js'
 const state = ref('loading') // loading | ready | submitting | done | error
 const questions = ref([])
 const answers = ref({})      // seq -> 用户选择/填答
+const graded = ref([])       // 今日已批改(含对错/正确答案/解析,刷新后仍可见)
 const date = ref('')
 const result = ref('')
 const errorMsg = ref('')
@@ -22,11 +23,12 @@ async function fetchToday() {
     if (!r.ok) throw new Error('HTTP ' + r.status)
     const d = await r.json()
     date.value = d.date
-    questions.value = d.questions
+    questions.value = d.questions || []
+    graded.value = d.graded || []
     // 预填答案对象(用数组索引做 key,不依赖 seq——seq 重复时 radio 会同名互斥丢勾选)
     answers.value = {}
     questions.value.forEach((q, qi) => answers.value[qi] = '')
-    // 恢复暂存的未提交答案(上次提交失败时存下的;带题目指纹,换题后旧草稿自动作废)
+    // 恢复暂存的未提交答案(上次提交失败/未判完时存下的;带题目指纹,换题后旧草稿自动作废)
     const fp = questions.value.map(q => q.seq).join(',')
     const draft = restoreAnswers(date.value || 'today', fp)
     if (draft && Object.keys(draft).length) {
@@ -61,7 +63,7 @@ async function submit() {
   const answerText = '答案：' + parts.join(' ')
 
   state.value = 'submitting'
-  // 提交前先暂存(万一失败刷新后不丢答案);带题目指纹,换题后旧草稿不误恢复
+  // 提交前先暂存(万一失败/未判完刷新后不丢答案);带题目指纹,换题后旧草稿不误恢复
   stashAnswers(date.value || 'today', answers.value, questions.value.map(q => q.seq).join(','))
   try {
     const r = await fetchWithTimeout(`${API_BASE}/grade`, {
@@ -70,14 +72,22 @@ async function submit() {
       body: JSON.stringify({ answer: answerText }),
     }, 15000) // 批改可能较慢,给 15s
     const d = await r.json().catch(() => null)
-    // 统一契约:成功 {ok:true,result};失败可能是 HTTPException {detail} 或 {ok:false,result}
+    // 统一契约:成功 {ok:true,result,pending_remaining};失败可能是 HTTPException {detail} 或 {ok:false,result}
     if (!r.ok || !d || d.ok !== true) {
       const msg = d && (d.detail || d.result || d.error)
       throw new Error(msg ? (typeof msg === 'string' ? msg : JSON.stringify(msg)) : ('HTTP ' + r.status))
     }
     result.value = d.result || '(无结果)'
     state.value = 'done'
-    clearStash(date.value || 'today')
+    // 仅当没有剩余未判题(全部批改完成)才清除草稿;
+    // 若仍有未判题(如 AI 暂不可用/部分格式未匹配),保留草稿,刷新后自动恢复,避免重填。
+    if (d.pending_remaining === 0) {
+      clearStash(date.value || 'today')
+    } else {
+      draftNotice.value = '⚠️ 部分题目未判(AI 暂不可用或格式未匹配),你的答案已保存,可稍后重新提交'
+    }
+    // 刷新已批改列表(刚批完的题立刻出现在"今日已批改")
+    fetchToday()
   } catch (e) {
     state.value = 'error'
     errorMsg.value = '提交失败: ' + e.message + '(答案已暂存,刷新后可恢复,不会丢失)'
@@ -147,75 +157,105 @@ onMounted(fetchToday)
       <button @click="fetchToday">重试</button>
     </div>
 
-    <template v-else-if="state === 'ready' || state === 'submitting'">
-      <p v-if="draftNotice" class="draft-notice">{{ draftNotice }}</p>
-      <p v-if="questions.length === 0" class="status">
-        今天暂时没有待批改的小测题。<br>
-        小测每天 07:30 / 13:30 / 19:00 由学习系统 @Studyingschedulebot 自动出题,答过的题会自动批改。<br>
-        你也可点击下方「⏭️ 下一轮学习」生成新题练手。
-      </p>
-
-      <div v-for="(q, qi) in questions" :key="q.seq" class="question">
-        <div class="qhead">
-          <span class="badge">{{ q.subject }}</span>
-          <span class="qtype">{{ q.type === 'choice' ? '选择题' : '问答题' }}</span>
-        </div>
-        <p class="qtext"><b>[{{ q.seq }}]</b> {{ q.q || q.title }}</p>
-
-        <!-- 选择题 -->
-        <div v-if="q.type === 'choice'" class="options">
-          <label v-for="(opt, key) in q.options" :key="key"
-                 class="opt" :class="{ selected: answers[qi] === key }">
-            <!-- name 用索引 qi 保证唯一(seq 重复时同名 radio 会互斥丢勾选) -->
-            <input type="radio" :name="'q' + qi" :value="key"
-                   :checked="answers[qi] === key"
-                   :disabled="state === 'submitting'"
-                   @change="answers[qi] = key" />
-            <span class="opt-key">{{ key }}</span>
-            <span class="opt-text">{{ opt }}</span>
-          </label>
-        </div>
-        <!-- 问答题 -->
-        <div v-else class="qa-area">
-          <div class="sym-toolbar">
-            <button type="button" class="sym-toggle" @click="showSymbolPanel(qi)">
-              ➗ 数学符号
-            </button>
+    <template v-else>
+      <!-- 今日已批改(含对错/正确答案/解析;刷新后仍可见,不再丢失批改结果) -->
+      <div v-if="graded.length" class="graded-section">
+        <h3>📊 今日已批改 <span class="graded-count">{{ graded.length }} 道</span></h3>
+        <div v-for="g in graded" :key="'g' + g.seq + '_' + (g.at || '')"
+             class="question graded-card" :class="g.correct ? 'g-correct' : 'g-wrong'">
+          <div class="qhead">
+            <span class="badge">{{ g.subject || '未知科目' }}</span>
+            <span class="g-mark">{{ g.correct ? '✅ 答对' : '❌ 答错' }}</span>
           </div>
-          <!-- v-show 而非 v-if:面板在挂载时即渲染(仅隐藏),避免 iPad WebKit
-               首次 v-if 插入时符号空白、点击后才显示的渲染 bug -->
-          <!-- 符号面板:用 visibility 常驻渲染(不 display:none),iOS 首次展开即显示全部字形 -->
-          <div :class="['sym-panel', { open: currentQaSeq === qi }]">
-            <button v-for="s in MATH_SYMBOLS" :key="s" type="button"
-                    class="sym-btn" @click="insertSymbol(s, qi)">{{ s }}</button>
+          <p class="qtext"><b>[{{ g.seq }}]</b> {{ g.q || g.title || ('题 #' + g.seq) }}</p>
+          <p class="g-note">{{ g.note || (g.correct ? '回答正确' : '回答错误') }}</p>
+          <!-- 正确答案: 选择题显示选项字母+内容;问答题显示答案要点 -->
+          <div v-if="g.type === 'choice' && g.answer" class="g-answer">
+            ✅ 正确答案: <b>{{ g.answer }}.</b> {{ (g.options || {})[g.answer] || '' }}
           </div>
-          <textarea :placeholder="'在此输入你的作答...'"
-                    rows="3" :disabled="state === 'submitting'"
-                    v-model="answers[qi]"></textarea>
+          <div v-else-if="g.answer && g.answer.points && g.answer.points.length" class="g-answer">
+            <p class="g-ans-title">✅ 答案要点:</p>
+            <ul class="g-ans-list">
+              <li v-for="(pt, i) in g.answer.points" :key="i">{{ pt }}</li>
+            </ul>
+          </div>
+          <div v-if="g.solution" class="g-solution">
+            <p class="g-ans-title">📝 解题步骤:</p>
+            <pre>{{ g.solution }}</pre>
+          </div>
         </div>
       </div>
 
-      <div class="actions" v-if="questions.length > 0">
-        <button :disabled="state === 'submitting'" @click="submit">
-          {{ state === 'submitting' ? 'AI 批改中...' : '✅ 提交批改' }}
-        </button>
-      </div>
+      <template v-if="state === 'ready' || state === 'submitting'">
+        <p v-if="draftNotice" class="draft-notice">{{ draftNotice }}</p>
+        <p v-if="questions.length === 0" class="status">
+          今天暂时没有待批改的小测题。<br>
+          小测每天 07:30 / 13:30 / 19:00 由学习系统 @Studyingschedulebot 自动出题,答过的题会自动批改。<br>
+          你也可点击下方「⏭️ 下一轮学习」生成新题练手。
+        </p>
 
-      <div class="advance-area">
-        <button class="advance-btn" :disabled="advancing" @click="nextRound">
-          {{ advancing ? '⏳ 生成中...' : '⏭️ 下一轮学习' }}
-        </button>
-        <p v-if="advanceMsg" class="advance-msg">{{ advanceMsg }}</p>
-        <p class="hint">点击后调用 AI 生成下一轮练习题(约 30-120 秒,耐心等待;重复点击不会重复生成)。</p>
+        <div v-for="(q, qi) in questions" :key="q.seq" class="question">
+          <div class="qhead">
+            <span class="badge">{{ q.subject }}</span>
+            <span class="qtype">{{ q.type === 'choice' ? '选择题' : '问答题' }}</span>
+          </div>
+          <p class="qtext"><b>[{{ q.seq }}]</b> {{ q.q || q.title }}</p>
+
+          <!-- 选择题 -->
+          <div v-if="q.type === 'choice'" class="options">
+            <label v-for="(opt, key) in q.options" :key="key"
+                   class="opt" :class="{ selected: answers[qi] === key }">
+              <!-- name 用索引 qi 保证唯一(seq 重复时同名 radio 会互斥丢勾选) -->
+              <input type="radio" :name="'q' + qi" :value="key"
+                     :checked="answers[qi] === key"
+                     :disabled="state === 'submitting'"
+                     @change="answers[qi] = key" />
+              <span class="opt-key">{{ key }}</span>
+              <span class="opt-text">{{ opt }}</span>
+            </label>
+          </div>
+          <!-- 问答题 -->
+          <div v-else class="qa-area">
+            <div class="sym-toolbar">
+              <button type="button" class="sym-toggle" @click="showSymbolPanel(qi)">
+                ➗ 数学符号
+              </button>
+            </div>
+            <!-- v-show 而非 v-if:面板在挂载时即渲染(仅隐藏),避免 iPad WebKit
+                 首次 v-if 插入时符号空白、点击后才显示的渲染 bug -->
+            <!-- 符号面板:用 visibility 常驻渲染(不 display:none),iOS 首次展开即显示全部字形 -->
+            <div :class="['sym-panel', { open: currentQaSeq === qi }]">
+              <button v-for="s in MATH_SYMBOLS" :key="s" type="button"
+                      class="sym-btn" @click="insertSymbol(s, qi)">{{ s }}</button>
+            </div>
+            <textarea :placeholder="'在此输入你的作答...'"
+                      rows="3" :disabled="state === 'submitting'"
+                      v-model="answers[qi]"></textarea>
+          </div>
+        </div>
+
+        <div class="actions" v-if="questions.length > 0">
+          <button :disabled="state === 'submitting'" @click="submit">
+            {{ state === 'submitting' ? 'AI 批改中...' : '✅ 提交批改' }}
+          </button>
+        </div>
+
+        <div class="advance-area">
+          <button class="advance-btn" :disabled="advancing" @click="nextRound">
+            {{ advancing ? '⏳ 生成中...' : '⏭️ 下一轮学习' }}
+          </button>
+          <p v-if="advanceMsg" class="advance-msg">{{ advanceMsg }}</p>
+          <p class="hint">点击后调用 AI 生成下一轮练习题(约 30-120 秒,耐心等待;重复点击不会重复生成)。</p>
+        </div>
+      </template>
+
+      <div v-else-if="state === 'done'" class="result">
+        <h3>批改结果</h3>
+        <pre>{{ result }}</pre>
+        <p class="hint">进度已自动写入学习系统(掌握度↑ / 错题进错题本)。</p>
+        <button @click="fetchToday">继续下一批</button>
       </div>
     </template>
-
-    <div v-else-if="state === 'done'" class="result">
-      <h3>批改结果</h3>
-      <pre>{{ result }}</pre>
-      <p class="hint">进度已自动写入学习系统(掌握度↑ / 错题进错题本)。</p>
-      <button @click="fetchToday">继续下一批</button>
-    </div>
   </div>
 </template>
 
@@ -274,4 +314,27 @@ html.dark .sym-btn:hover { background: #0a84ff; color: #fff; border-color: #0a84
 html.dark .result pre { background: #1c1c20; color: #f5f5f7; }
 html.dark textarea { background: #1c1c20; border-color: #3a3a3c; color: #f5f5f7; }
 html.dark .advance-area { border-top-color: #2c2c2e; }
+
+/* 今日已批改区块 */
+.graded-section { margin: 4px 0 16px; }
+.graded-section h3 { display: flex; align-items: center; gap: 8px; font-size: 17px; margin: 12px 0 4px; }
+.graded-count { font-size: 12px; font-weight: 600; color: #6e6e73; background: #f0f0f0; padding: 2px 10px; border-radius: 12px; }
+.graded-card { border-left: 4px solid #34c759; }
+.graded-card.g-wrong { border-left-color: #ff3b30; }
+.g-mark { font-size: 12px; font-weight: 700; padding: 2px 10px; border-radius: 12px; background: rgba(52,199,89,.12); color: #248a3d; }
+.g-wrong .g-mark { background: rgba(255,59,48,.12); color: #d70015; }
+.g-note { font-size: 14px; color: #3a3a3c; margin: 6px 0; }
+.g-answer { font-size: 14px; color: #1d1d1f; background: rgba(52,199,89,.08); border: 1px solid rgba(52,199,89,.25); border-radius: 10px; padding: 8px 12px; margin: 6px 0; }
+.g-ans-title { margin: 0 0 4px; font-weight: 600; }
+.g-ans-list { margin: 0; padding-left: 20px; }
+.g-ans-list li { margin: 2px 0; }
+.g-solution { font-size: 14px; background: rgba(255,149,0,.08); border: 1px solid rgba(255,149,0,.25); border-radius: 10px; padding: 8px 12px; margin: 6px 0; }
+.g-solution pre { white-space: pre-wrap; margin: 4px 0 0; font-size: 13px; color: #3a3a3c; font-family: inherit; line-height: 1.6; }
+html.dark .graded-count { background: #2c2c2e; color: #aeaeb2; }
+html.dark .g-mark { background: rgba(48,209,88,.15); color: #30d158; }
+html.dark .g-wrong .g-mark { background: rgba(255,69,58,.15); color: #ff453a; }
+html.dark .g-note { color: #d1d1d6; }
+html.dark .g-answer { background: rgba(48,209,88,.1); border-color: rgba(48,209,88,.3); color: #f5f5f7; }
+html.dark .g-solution { background: rgba(255,159,10,.1); border-color: rgba(255,159,10,.3); }
+html.dark .g-solution pre { color: #d1d1d6; }
 </style>
