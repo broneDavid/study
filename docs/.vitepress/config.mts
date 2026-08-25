@@ -14,6 +14,11 @@ export default defineConfig({
   head: [
     ['meta', { name: 'description', content: '记录学习积累内容 (考研: 数一·机械原理·英一·化工设备)' }],
     ['meta', { name: 'theme-color', content: '#0071e3' }],
+    // PWA:可安装到 iPad 主屏 + 支持离线阅读静态内容
+    ['link', { rel: 'manifest', href: '/study/manifest.webmanifest' }],
+    ['link', { rel: 'apple-touch-icon', href: '/study/icons/apple-touch-icon.png' }],
+    ['meta', { name: 'apple-mobile-web-app-capable', content: 'yes' }],
+    ['meta', { name: 'apple-mobile-web-app-status-bar-style', content: 'default' }],
   ],
 
   markdown: {
@@ -21,9 +26,10 @@ export default defineConfig({
   },
 
   themeConfig: {
-    // 导航(高频 4 项,低频项在侧边栏/门户页)
+    // 导航(高频 5 项,低频项在侧边栏/门户页)
     nav: [
       { text: '每日学习', link: '/daily' },
+      { text: '复习地图', link: '/map' },
       { text: '在线小测', link: '/quiz' },
       { text: '错题本', link: '/mistakes' },
       { text: '每周周报', link: '/reports/' },
@@ -48,6 +54,7 @@ export default defineConfig({
           items: [
             { text: '首页', link: '/' },
             { text: '每日学习', link: '/daily' },
+            { text: '复习地图', link: '/map' },
             { text: '在线小测', link: '/quiz' },
             { text: '错题本', link: '/mistakes' },
           ],
