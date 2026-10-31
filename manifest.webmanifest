@@ -1,0 +1,17 @@
+{
+  "name": "启的考研笔记",
+  "short_name": "考研笔记",
+  "description": "考研备考学习记录 · 高数 / 机械原理 / 英语 / 化工设备",
+  "start_url": "/study/",
+  "scope": "/study/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#ffffff",
+  "theme_color": "#0071e3",
+  "lang": "zh-CN",
+  "icons": [
+    { "src": "/study/icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/study/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/study/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
